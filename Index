@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Simple Site</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f0f0f0;
+    }
+    header {
+      background: #333;
+      padding: 1em;
+      text-align: center;
+    }
+    header a {
+      color: white;
+      margin: 0 1em;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    main {
+      padding: 2em;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="index.html">Home</a>
+    <a href="g1.html">Go to G1 Page</a>
+  </header>
+  <main>
+    <h1>Welcome to My Site</h1>
+    <p>This is a simple homepage that links to my HTML pages.</p>
+  </main>
+</body>
+</html>
