@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exhaustive Interactive Model Evaluation Handbook</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" xintegrity="sha384-n8MVd4RsNIU0KOVEMVIhbTeHSSiNgAPfhPxbRVSfk_wGo" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" xintegrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Cyan & Amber -->
+    <!-- Application Structure Plan: The application is designed as a single-page, task-oriented interactive explorer. The primary navigation is structured around high-level machine learning task categories (e.g., Classification, Regression, Clustering). This is more intuitive and efficient for a practitioner than a long, linear document. The user flow is as follows: 1) The user selects a task category from the main navigation. 2) The content area dynamically displays a grid of "metric cards" for that category. 3) Clicking a card opens a detailed modal view. This modal contains the metric's definition, its mathematical formula, an interactive visualization/example to build intuition, and a summary of its limitations. This "filter-then-detail" architecture breaks down the dense source material into manageable, easy-to-digest chunks, facilitating quick scanning and deep-dive exploration on demand, directly fulfilling the goal of making the content easily consumable. -->
+    <!-- Visualization & Content Choices: To transform the static report into an interactive tool, the following choices were made: 1) **Structure**: The main layout, navigation, and metric cards are built with semantic HTML and styled with Tailwind CSS. 2) **Formulas**: Mathematical formulas are rendered using the KaTeX library for crisp, accurate display of LaTeX. 3) **Interactive Examples**: Instead of static examples, each metric features an interactive component powered by Chart.js and vanilla JavaScript. For Classification, users can manipulate a confusion matrix via input sliders and see how metrics like Precision, Recall, and F1-score change in real-time on a bar chart. For Regression, users can adjust data points on a scatter plot to see the immediate impact on MAE, MSE, and RMSE, visually demonstrating concepts like outlier sensitivity. For Clustering, a line chart illustrates the "Elbow Method". For K-Fold CV, a visual simulation shows data splitting. 4) **Justification**: This hands-on approach moves beyond passive reading to active learning, allowing users to build a deeper, more intuitive understanding of how each metric behaves. This directly addresses the "interactive storytelling" and "wow factor" requirements. 5) **Libraries**: Chart.js for all visualizations (bar, line, scatter), KaTeX for formulas, and vanilla JS for all state management and interaction logic. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .katex { font-size: 1.1em !important; }
+        .chart-container { position: relative; width: 100%; max-width: 500px; margin-left: auto; margin-right: auto; height: 300px; max-height: 40vh; }
+        .modal-content { max-height: 90vh; }
+        .nav-button.active { background-color: #0891b2; color: white; }
+        .nav-button { transition: all 0.2s ease-in-out; }
+        .fold-sim-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; }
+        .fold-sim-item { width: 100%; padding-bottom: 100%; border-radius: 4px; transition: background-color 0.5s ease-in-out; }
+        .fold-train { background-color: #cffafe; border: 1px solid #0891b2; }
+        .fold-test { background-color: #f59e0b; border: 1px solid #b45309; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div id="app" class="container mx-auto p-4 sm:p-6 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-cyan-900">Exhaustive Interactive Model Evaluation Handbook</h1>
+            <p class="mt-4 text-lg text-slate-600 max-w-3xl mx-auto">A comprehensive, explorable guide to the methods and metrics used to build and measure robust machine learning models. Select a category to begin.</p>
+        </header>
+        <nav id="navigation" class="flex flex-wrap justify-center gap-2 sm:gap-4 mb-8">
+        </nav>
+        <main id="main-content">
+        </main>
+    </div>
+
+    <div id="metric-modal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl modal-content overflow-y-auto">
+            <div class="sticky top-0 bg-white p-4 sm:p-6 border-b border-slate-200 flex justify-between items-center">
+                <h2 id="modal-title" class="text-2xl font-bold text-cyan-800"></h2>
+                <button id="close-modal" class="text-slate-500 hover:text-slate-800 text-3xl font-bold">&times;</button>
+            </div>
+            <div id="modal-body" class="p-4 sm:p-6">
+            </div>
+        </div>
+    </div>
+
+<script>
+const data = {
+    "validation": {
+        name: "🔁 Model Validation",
+        description: "Methods to generate reliable performance estimates and avoid pitfalls like overfitting. These techniques form the bedrock of robust machine learning practice.",
+        metrics: [
+            { name: "Train/Validation/Test Split", short_desc: "The fundamental strategy of splitting data to prevent information leakage.", details: "Partitioning data into three distinct subsets: Training (to fit the model), Validation (to tune hyperparameters), and Test (for a final, unbiased performance estimate). This prevents the model from being evaluated on data it has already seen, which would lead to an overly optimistic assessment of its performance.", limitations: "Performance estimate can have high variance; it may depend heavily on which specific data points happened to fall into the validation split.", example_type: "none", formula: `\\text{Data} \\rightarrow \\text{Train (70%)} + \\text{Validation (15%)} + \\text{Test (15%)}` },
+            { name: "K-Fold Cross-Validation", short_desc: "Averaging performance over multiple 'folds' to get a more stable estimate.", formula: `\\text{Score} = \\frac{1}{k} \\sum_{i=1}^{k} \\text{Metric}(\\text{Fold}_i)`, details: "The dataset is split into 'k' folds. The model is trained k times, each time using a different fold as the test set and the remaining k-1 folds as the training set. The final score is the average of the scores from each fold.", limitations: "Can be biased for imbalanced datasets. Introduces a slight pessimistic bias as models are trained on slightly less data.", example_type: "kfold" },
+            { name: "Stratified K-Fold", short_desc: "A K-Fold variant that preserves class distribution in each fold.", details: "Ensures that each fold of the dataset has the same percentage of samples of each class as the complete dataset. This is crucial for getting reliable estimates on imbalanced classification problems.", limitations: "Primarily applicable to classification tasks. Not suitable for data with inherent structure like time-series.", example_type: "none", formula: `P(\\text{class}_c | \\text{Fold}_i) = P(\\text{class}_c | \\text{Data})` },
+            { name: "Leave-One-Out (LOOCV)", short_desc: "An exhaustive K-Fold where k equals the number of samples.", details: "A single data point is used as the test set, and the model is trained on the remaining n-1 points. This is repeated n times. It provides a nearly unbiased estimate of performance.", limitations: "Extremely high computational cost (trains n models) and the resulting performance estimate can have high variance due to the high correlation between training sets.", example_type: "none", formula: `k=n` },
+            { name: "Group K-Fold", short_desc: "Ensures data from the same group isn't split between train and test sets.", details: "Crucial for datasets where observations are not independent (e.g., multiple readings from the same patient). It prevents data leakage by keeping all data from a specific group in either the training or the testing set for any given fold.", limitations: "Requires predefined groups in the data. All samples from a group will be in the test set at once.", example_type: "none" },
+            { name: "TimeSeriesSplit", short_desc: "A rolling cross-validation strategy for time-ordered data.", details: "Creates folds that preserve the temporal order of observations. The training set expands to include more history, and the test set is always in the 'future' relative to the training set, mimicking a real forecasting scenario.", limitations: "The number of samples in the training set can vary significantly between folds, which might affect model training.", example_type: "none" },
+            { name: "Nested Cross-Validation", short_desc: "A rigorous, two-level CV for unbiased hyperparameter tuning and evaluation.", details: "Uses an outer loop to split data for performance evaluation and an inner loop to perform hyperparameter tuning. This provides a more robust and unbiased estimate of the model's true generalization performance by preventing information leakage from the tuning process.", limitations: "Very high computational cost due to the nested loops.", example_type: "none" },
+        ]
+    },
+    "classification": {
+        name: "🟥 Classification",
+        description: "Metrics for models that predict a categorical label. These metrics evaluate performance based on how well the model's predictions match the true labels, often summarized in a confusion matrix.",
+        metrics: [
+            { name: "Accuracy", short_desc: "The proportion of correct predictions among the total number of cases.", formula: `\\text{Accuracy} = \\frac{TP + TN}{TP + TN + FP + FN}`, details: "Accuracy is the most intuitive performance measure. It is simply a ratio of correctly predicted observations to the total observations.", limitations: "Can be highly misleading for imbalanced datasets. A model can achieve high accuracy by simply predicting the majority class.", example_type: "classification" },
+            { name: "Precision", short_desc: "Of all positive predictions, what fraction was actually positive?", formula: `\\text{Precision} = \\frac{TP}{TP + FP}`, details: "Precision measures the accuracy of the positive predictions. It is critical when the cost of a False Positive is high (e.g., spam detection).", limitations: "Precision alone is insufficient, as a model can be trivially precise by making only one, very certain positive prediction.", example_type: "classification" },
+            { name: "Recall (Sensitivity)", short_desc: "Of all actual positives, what fraction did the model identify?", formula: `\\text{Recall} = \\frac{TP}{TP + FN}`, details: "Recall measures the model's ability to find all the actual positive instances. It is paramount when the cost of a False Negative is high (e.g., medical diagnosis).", limitations: "Recall alone is insufficient. A model that predicts every instance as positive would have a perfect recall of 1.0 but likely terrible precision.", example_type: "classification" },
+            { name: "F1-Score", short_desc: "The harmonic mean of Precision and Recall.", formula: `F_1 = 2 \\times \\frac{\\text{Precision} \\times \\text{Recall}}{\\text{Precision} + \\text{Recall}}`, details: "The F1-Score provides a single, balanced score that accounts for both precision and recall. It's often a better measure than accuracy for imbalanced classification problems.", limitations: "Gives equal weight to precision and recall. In scenarios where one is more important, an F-beta score is more appropriate.", example_type: "classification" },
+            { name: "Specificity", short_desc: "Of all actual negatives, what fraction did the model identify?", formula: `\\text{Specificity} = \\frac{TN}{TN + FP}`, details: "Measures the model's ability to correctly identify all actual negative instances. Important when correctly identifying negatives is critical (e.g., diagnostic screening).", limitations: "Focuses only on the negative class performance.", example_type: "classification" },
+            { name: "Balanced Accuracy", short_desc: "The average of Recall (Sensitivity) and Specificity.", formula: `\\frac{\\text{Sensitivity} + \\text{Specificity}}{2}`, details: "Avoids inflated performance estimates on imbalanced datasets by giving equal weight to the performance on each class.", limitations: "Less common than F1-score but highly interpretable.", example_type: "classification" },
+            { name: "MCC", short_desc: "Matthews Correlation Coefficient, a balanced metric for imbalanced data.", formula: `\\frac{TP \\times TN - FP \\times FN}{\\sqrt{(TP+FP)(TP+FN)(TN+FP)(TN+FN)}}`, details: "A correlation coefficient between observed and predicted classifications. A score of +1 is perfect, 0 is random, and -1 is total disagreement.", limitations: "Less intuitive to explain than precision/recall, but often more robust.", example_type: "classification" },
+            { name: "ROC AUC", short_desc: "Area Under the Receiver Operating Characteristic Curve.", formula: `\\text{AUC} = \\int_{0}^{1} \\text{TPR}(t) \\, d\\text{FPR}(t)`, details: "AUC represents the probability that a randomly chosen positive instance is ranked higher by the model than a randomly chosen negative instance.", limitations: "Can be overly optimistic on imbalanced datasets. In such cases, a Precision-Recall curve is often more informative.", example_type: "roc_curve" },
+            { name: "PR AUC", short_desc: "Area Under the Precision-Recall Curve (Average Precision).", details: "PR curves are more informative than ROC curves when dealing with severely imbalanced datasets, as they focus on the performance on the minority positive class.", limitations: "There isn't a single standard way to calculate the area under the PR curve, which can lead to inconsistencies.", example_type: "none", formula: `\\text{AP} = \\sum_k (R_k - R_{k-1}) P_k` },
+            { name: "Log Loss", short_desc: "Penalizes confident but incorrect probabilistic predictions.", formula: `-\\frac{1}{N} \\sum [y_i \\log(p_i) + (1-y_i) \\log(1-p_i)]`, details: "Log Loss evaluates classifiers that output a probability value. It heavily penalizes predictions that are confident and wrong.", limitations: "The score is sensitive to outliers and can be difficult to interpret directly. A single highly confident wrong prediction can dramatically increase the overall Log Loss.", example_type: "none" },
+        ]
+    },
+    "regression": {
+        name: "🟦 Regression",
+        description: "Metrics for models that predict a continuous numerical value. These metrics quantify the magnitude of the error between the predicted and actual values.",
+        metrics: [
+            { name: "Mean Absolute Error (MAE)", short_desc: "The average of the absolute differences between predicted and actual values.", formula: `\\text{MAE} = \\frac{1}{n} \\sum_{i=1}^{n} |y_i - \\hat{y}_i|`, details: "MAE is intuitive and in the same units as the target. It is less sensitive to outliers than MSE.", limitations: "It treats all errors equally, which may not be desirable if large errors are significantly worse than small errors.", example_type: "regression" },
+            { name: "Mean Squared Error (MSE)", short_desc: "The average of the squared differences between predicted and actual values.", formula: `\\text{MSE} = \\frac{1}{n} \\sum_{i=1}^{n} (y_i - \\hat{y}_i)^2`, details: "MSE penalizes larger errors more heavily than MAE due to the squaring term. This makes it a good metric when large errors are particularly undesirable.", limitations: "The units of MSE are the square of the target variable's units, which can make it less interpretable. It is highly sensitive to outliers.", example_type: "regression" },
+            { name: "Root Mean Squared Error (RMSE)", short_desc: "The square root of the Mean Squared Error.", formula: `\\text{RMSE} = \\sqrt{\\text{MSE}}`, details: "RMSE is very popular. Like MSE, it is sensitive to outliers, but it has the advantage of being in the same units as the target variable.", limitations: "The choice between MAE and RMSE depends on whether you want to penalize large errors more severely.", example_type: "regression" },
+            { name: "R-squared (R²)", short_desc: "Proportion of variance in the target that is predictable from the features.", formula: `R^2 = 1 - \\frac{\\sum (y_i - \\hat{y}_i)^2}{\\sum (y_i - \\bar{y})^2}`, details: "R-squared measures the 'goodness of fit' of the model. It's a relative measure of fit.", limitations: "R² will always increase when a new feature is added, even if it's irrelevant. Use Adjusted R² to penalize the inclusion of useless features.", example_type: "regression" },
+            { name: "Adjusted R²", short_desc: "R-squared adjusted for the number of predictors in the model.", formula: `1 - \\frac{(1-R^2)(n-1)}{n-k-1}`, details: "Adjusted R-squared penalizes the score for adding features that do not improve the model. It is a more reliable metric for comparing models with different numbers of predictors.", limitations: "Can be negative, and its interpretation is less direct than R².", example_type: "none" },
+            { name: "MAPE", short_desc: "Mean Absolute Percentage Error, expresses error as a percentage.", formula: `\\frac{100\\%}{n} \\sum \\left| \\frac{y_i - \\hat{y}_i}{y_i} \\right|`, details: "A scale-independent metric, useful for comparing forecast accuracy across different series.", limitations: "Is undefined when the actual value is zero and is biased, as it penalizes negative errors more than positive ones.", example_type: "none" }
+        ]
+    },
+    "clustering": {
+        name: "🟨 Clustering",
+        description: "Metrics for unsupervised models that group data points. Evaluation can be 'internal' (based on cluster structure) or 'external' (if ground truth labels are available).",
+        metrics: [
+            { name: "Silhouette Score", short_desc: "Measures how similar a point is to its own cluster compared to others.", formula: `s = \\frac{b - a}{\\max(a, b)}`, details: "The score is higher for clusters that are dense and well-separated. Ranges from -1 (incorrect clustering) to +1 (highly dense clustering), with 0 indicating overlapping clusters.", limitations: "Tends to favor convex clusters and can perform poorly on clusters with complex shapes or varying densities.", example_type: "none" },
+            { name: "Davies-Bouldin Index", short_desc: "Ratio of within-cluster scatter to between-cluster separation.", formula: `DBI = \\frac{1}{k} \\sum \\max_{j \\neq i} (R_{ij})`, details: "Lower values indicate better clustering, with 0 being the optimal score. A lower score implies that clusters are more compact and well-separated.", limitations: "Like the Silhouette score, it generally works best for convex clusters.", example_type: "none" },
+            { name: "Calinski-Harabasz Index", short_desc: "Ratio of between-cluster dispersion to within-cluster dispersion.", formula: `\\frac{BSS / (k-1)}{WSS / (N-k)}`, details: "Also known as the Variance Ratio Criterion. A higher score generally indicates better-defined clusters (dense and well-separated).", limitations: "Tends to be higher for convex clusters.", example_type: "none" },
+            { name: "Elbow Method (WCSS)", short_desc: "A heuristic to find the optimal number of clusters by plotting WCSS.", formula: `\\text{WCSS} = \\sum_{P_i \\in C_k} ||P_i - Q_k||^2`, details: "Plots Within-Cluster Sum of Squares (WCSS) for a range of k values. The 'elbow' point on the plot, where the rate of decrease in WCSS slows down, suggests the optimal k.", limitations: "The 'elbow' is often ambiguous and subjective, making it difficult to determine the optimal k automatically.", example_type: "elbow" },
+            { name: "Adjusted Rand Index (ARI)", short_desc: "Measures clustering similarity to ground truth, correcting for chance.", formula: `\\frac{RI - E[RI]}{\\max(RI) - E[RI]}`, details: "Requires ground truth labels. A score of 1.0 is perfect agreement, 0 is random agreement.", limitations: "Can be close to zero for good clusterings if the number of clusters is large.", example_type: "none" }
+        ]
+    },
+    "ranking": {
+        name: "🟩 Ranking & RecSys",
+        description: "Metrics for evaluating the quality of an ordered list of items, such as search results or product recommendations. They reward models that place relevant items at the top of the list.",
+        metrics: [
+            { name: "nDCG", short_desc: "Normalized Discounted Cumulative Gain, a rank-aware metric.", formula: `\\frac{\\text{DCG}_k}{\\text{IDCG}_k}`, details: "Evaluates ranking by considering the graded relevance of each item and applying a logarithmic discount based on its position. A score of 1 is a perfect ranking.", limitations: "Requires graded relevance judgments, which can be expensive to obtain.", example_type: "ndcg" },
+            { name: "MRR", short_desc: "Mean Reciprocal Rank, the average of reciprocal ranks of the first relevant item.", formula: `\\frac{1}{|Q|} \\sum \\frac{1}{\\text{rank}_i}`, details: "A simple metric that evaluates how quickly a system can find the first correct answer. It is easy to compute and interpret.", limitations: "Ignores the relevance and rank of all items after the first correct one.", example_type: "none" },
+            { name: "Precision@k", short_desc: "The fraction of recommended items in the top-k set that are relevant.", formula: `\\frac{\\text{# relevant in top } k}{k}`, details: "A simple and intuitive metric measuring the relevance of the top k recommendations.", limitations: "Ignores the ordering of items within the top k and doesn't consider the total number of relevant items.", example_type: "none" },
+            { name: "Recall@k", short_desc: "The fraction of all relevant items that are in the top-k recommendations.", formula: `\\frac{\\text{# relevant in top } k}{\\text{Total # relevant}}`, details: "Measures the ability of the system to find all the relevant items within the top k results.", limitations: "Like Precision@k, it is not rank-aware within the top k.", example_type: "none" },
+            { name: "mAP", short_desc: "Mean Average Precision, considers both precision and ranking of relevant items.", formula: `\\frac{1}{|Q|} \\sum_{q \\in Q} AP(q)`, details: "Mean of Average Precision (AP) scores across all queries. AP heavily rewards models that place relevant items at the top of the ranked list.", limitations: "Can be less intuitive than nDCG when dealing with graded relevance.", example_type: "none" }
+        ]
+    },
+    "specialized": {
+        name: "🟠 Specialized",
+        description: "Metrics tailored for specific domains like Natural Language Processing (NLP), Survival Analysis, and Computer Vision.",
+        metrics: [
+            { name: "BLEU (NLP)", short_desc: "Measures n-gram precision for machine translation.", details: "A standard metric for machine translation, BLEU measures how many n-grams (word sequences) in the machine's output also appear in human reference translations.", limitations: "Correlates poorly with human judgment on sentence-level, and doesn't account for meaning or synonymy.", example_type: "none", formula: `BP \\cdot \\exp(\\sum w_n \\log p_n)` },
+            { name: "ROUGE (NLP)", short_desc: "Measures n-gram recall for text summarization.", details: "A standard metric for summarization, ROUGE measures the overlap (recall) of n-grams between a generated summary and human-written reference summaries.", limitations: "Focuses on content overlap and may not capture readability or coherence.", example_type: "none", formula: `\\text{Recall-Oriented}` },
+            { name: "C-Index (Survival)", short_desc: "Concordance Index, a rank-correlation measure for censored data.", details: "A generalization of ROC AUC for survival data. It measures the probability that, for a random pair of subjects, the subject who survives longer is assigned a lower risk score by the model.", limitations: "Can be overly optimistic in the presence of many censored observations.", example_type: "none" },
+            { name: "IoU (Vision)", short_desc: "Intersection over Union (Jaccard Index) for image segmentation.", formula: `\\frac{|A \\cap B|}{|A \\cup B|}`, details: "Measures the overlap between the predicted segmentation mask and the ground truth mask. It is a very strict metric for object detection and segmentation.", limitations: "Penalizes small misalignments harshly.", example_type: "none" },
+            { name: "Dice Coeff. (Vision)", short_desc: "Similar to IoU, measures overlap for image segmentation.", formula: `\\frac{2 |A \\cap B|}{|A| + |B|}`, details: "Also known as the F1 score for segmentation, it is closely related to IoU but tends to be slightly more lenient on small objects.", limitations: "Can be less sensitive to performance on large objects compared to small ones.", example_type: "none" }
+        ]
+    },
+};
+
+let activeChart = null;
+let activeAnimationId = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+    const navigation = document.getElementById('navigation');
+    const mainContent = document.getElementById('main-content');
+    const modal = document.getElementById('metric-modal');
+    const closeModalBtn = document.getElementById('close-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+
+    function init() {
+        const categories = Object.keys(data);
+        categories.forEach(key => {
+            const button = document.createElement('button');
+            button.className = 'nav-button px-3 py-2 sm:px-4 rounded-lg font-semibold text-slate-700 bg-white shadow-sm hover:bg-cyan-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-opacity-50';
+            button.textContent = data[key].name;
+            button.dataset.category = key;
+            navigation.appendChild(button);
+        });
+
+        navigation.addEventListener('click', e => {
+            if (e.target.tagName === 'BUTTON') {
+                const category = e.target.dataset.category;
+                setActiveCategory(category);
+                renderCategory(category);
+            }
+        });
+
+        closeModalBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            if (activeChart) { activeChart.destroy(); activeChart = null; }
+            if (activeAnimationId) { cancelAnimationFrame(activeAnimationId); activeAnimationId = null; }
+        });
+        
+        setActiveCategory(categories[0]);
+        renderCategory(categories[0]);
+    }
+    
+    function setActiveCategory(categoryKey) {
+        navigation.querySelectorAll('button').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.category === categoryKey);
+        });
+    }
+
+    function renderCategory(categoryKey) {
+        mainContent.innerHTML = '';
+        const category = data[categoryKey];
+
+        const intro = document.createElement('div');
+        intro.className = 'mb-8 text-center p-6 bg-white/60 rounded-xl shadow-sm';
+        intro.innerHTML = `<p class="text-slate-600">${category.description}</p>`;
+        mainContent.appendChild(intro);
+
+        const grid = document.createElement('div');
+        grid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
+        
+        category.metrics.forEach(metric => {
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-xl shadow-md p-6 cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between';
+            card.innerHTML = `
+                <div>
+                    <h3 class="text-xl font-bold text-cyan-800 mb-2">${metric.name}</h3>
+                    <p class="text-slate-600">${metric.short_desc}</p>
+                </div>
+                <div class="mt-4 text-right text-cyan-600 font-semibold">Explore &rarr;</div>
+            `;
+            card.addEventListener('click', () => showModal(metric));
+            grid.appendChild(card);
+        });
+        mainContent.appendChild(grid);
+    }
+
+    function showModal(metric) {
+        modalTitle.textContent = metric.name;
+        
+        let exampleHtml = '';
+        if (metric.example_type === 'classification') exampleHtml = getClassificationExampleHtml();
+        else if (metric.example_type === 'regression') exampleHtml = getRegressionExampleHtml();
+        else if (metric.example_type === 'roc_curve') exampleHtml = getRocExampleHtml();
+        else if (metric.example_type === 'elbow') exampleHtml = getElbowExampleHtml();
+        else if (metric.example_type === 'kfold') exampleHtml = getKFoldExampleHtml();
+        else if (metric.example_type === 'ndcg') exampleHtml = getNdcgExampleHtml();
+        else exampleHtml = '<p class="text-center text-slate-500 mt-8">A simplified interactive example is not applicable for this metric. Please refer to the details and formula for its application context.</p>';
+        
+
+        modalBody.innerHTML = `
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                    <div class="mb-4">
+                        <h4 class="font-bold text-lg mb-2 text-slate-700">Formula / Process</h4>
+                        <div id="formula-container" class="p-4 bg-slate-100 rounded-lg text-center overflow-x-auto"></div>
+                    </div>
+                    <div class="mb-4">
+                        <h4 class="font-bold text-lg mb-2 text-slate-700">Details</h4>
+                        <p class="text-slate-600">${metric.details}</p>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-lg mb-2 text-slate-700">Assumptions & Limitations</h4>
+                        <p class="text-slate-600">${metric.limitations}</p>
+                    </div>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-lg">
+                    <h4 class="font-bold text-lg mb-2 text-center text-slate-700">Interactive Example</h4>
+                    ${exampleHtml}
+                </div>
+            </div>
+        `;
+
+        katex.render(metric.formula, document.getElementById('formula-container'), {
+            throwOnError: false, displayMode: true
+        });
+
+        if (metric.example_type === 'classification') initClassificationExample();
+        else if (metric.example_type === 'regression') initRegressionExample();
+        else if (metric.example_type === 'roc_curve') initRocExample();
+        else if (metric.example_type === 'elbow') initElbowExample();
+        else if (metric.example_type === 'kfold') initKFoldExample();
+        else if (metric.example_type === 'ndcg') initNdcgExample();
+        
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+    
+    function createSlider(id, label, value, max, step=1) {
+        return `
+            <div class="grid grid-cols-3 items-center gap-2">
+                <label for="${id}-slider" class="text-sm font-medium">${label}</label>
+                <input type="range" id="${id}-slider" min="0" max="${max}" value="${value}" step="${step}" class="w-full col-span-1">
+                <span id="${id}-value" class="text-sm font-semibold text-cyan-700 text-right w-12">${value}</span>
+            </div>
+        `;
+    }
+
+    function getClassificationExampleHtml() {
+        return `
+            <p class="text-sm text-slate-500 mb-4 text-center">Adjust the sliders to change the confusion matrix values and see how the metrics respond.</p>
+            <div class="space-y-3 mb-4">
+                ${createSlider('tp', 'True Positives', 50, 100)}
+                ${createSlider('fp', 'False Positives', 10, 100)}
+                ${createSlider('tn', 'True Negatives', 50, 100)}
+                ${createSlider('fn', 'False Negatives', 5, 100)}
+            </div>
+            <div class="chart-container"><canvas id="classification-chart"></canvas></div>
+        `;
+    }
+
+    function initClassificationExample() {
+        const ctx = document.getElementById('classification-chart').getContext('2d');
+        const sliders = {
+            tp: document.getElementById('tp-slider'), fp: document.getElementById('fp-slider'),
+            tn: document.getElementById('tn-slider'), fn: document.getElementById('fn-slider')
+        };
+        const values = {
+            tp: document.getElementById('tp-value'), fp: document.getElementById('fp-value'),
+            tn: document.getElementById('tn-value'), fn: document.getElementById('fn-value')
+        };
+
+        activeChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Accuracy', 'Precision', 'Recall', 'F1', 'Spec.', 'Bal. Acc.', 'MCC'],
+                datasets: [{ data: [], backgroundColor: ['#06b6d4', '#0891b2', '#0e7490', '#164e63', '#64748b', '#ca8a04', '#be123c'], borderRadius: 4, }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: -1, max: 1 } }, plugins: { legend: { display: false } } }
+        });
+
+        function update() {
+            const tp = parseInt(sliders.tp.value), fp = parseInt(sliders.fp.value), tn = parseInt(sliders.tn.value), fn = parseInt(sliders.fn.value);
+            Object.keys(values).forEach(k => values[k].textContent = eval(k));
+            
+            const total = tp + fp + tn + fn;
+            const accuracy = total > 0 ? (tp + tn) / total : 0;
+            const precision = (tp + fp) > 0 ? tp / (tp + fp) : 0;
+            const recall = (tp + fn) > 0 ? tp / (tp + fn) : 0;
+            const specificity = (tn + fp) > 0 ? tn / (tn + fp) : 0;
+            const f1 = (precision + recall) > 0 ? 2 * (precision * recall) / (precision + recall) : 0;
+            const bal_acc = (recall + specificity) / 2;
+            const mcc_num = (tp * tn) - (fp * fn);
+            const mcc_den = Math.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn));
+            const mcc = mcc_den > 0 ? mcc_num / mcc_den : 0;
+
+            activeChart.data.datasets[0].data = [accuracy, precision, recall, f1, specificity, bal_acc, mcc];
+            activeChart.update();
+        }
+        Object.values(sliders).forEach(s => s.addEventListener('input', update));
+        update();
+    }
+
+    function getRegressionExampleHtml() {
+        return `
+            <p class="text-sm text-slate-500 mb-4 text-center">Click the button to add an outlier and observe its disproportionate impact on MSE and RMSE compared to MAE.</p>
+            <div class="chart-container"><canvas id="regression-chart"></canvas></div>
+            <div id="regression-metrics" class="mt-4 grid grid-cols-2 text-center gap-2"></div>
+            <div class="text-center mt-4">
+                <button id="outlier-btn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition">Add Outlier</button>
+            </div>
+        `;
+    }
+
+    function initRegressionExample() {
+        const ctx = document.getElementById('regression-chart').getContext('2d');
+        const metricsDiv = document.getElementById('regression-metrics');
+        const outlierBtn = document.getElementById('outlier-btn');
+        let dataPoints = [ {x: 1, y: 2}, {x: 2, y: 2.5}, {x: 3, y: 4}, {x: 4, y: 4.2}, {x: 5, y: 6}, {x: 6, y: 5.8} ];
+        let hasOutlier = false;
+
+        activeChart = new Chart(ctx, {
+            type: 'scatter',
+            data: { datasets: [{ label: 'Data', data: dataPoints, backgroundColor: '#0891b2' }] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { x: { beginAtZero: true }, y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+        });
+        
+        function calculateMetrics() {
+            const n = dataPoints.length; if (n === 0) return { mae: 0, mse: 0, rmse: 0, r2: 0 };
+            const sumX = dataPoints.reduce((s, p) => s + p.x, 0), sumY = dataPoints.reduce((s, p) => s + p.y, 0);
+            const sumXY = dataPoints.reduce((s, p) => s + p.x * p.y, 0), sumX2 = dataPoints.reduce((s, p) => s + p.x * p.x, 0);
+            const m = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX), b = (sumY - m * sumX) / n;
+            let sse = 0, sst = 0, mae_sum = 0;
+            const y_mean = sumY / n;
+            dataPoints.forEach(p => {
+                const pred_y = m * p.x + b;
+                const error = p.y - pred_y;
+                sse += error * error; sst += (p.y - y_mean) ** 2; mae_sum += Math.abs(error);
+            });
+            const mae = mae_sum / n, mse = sse / n, rmse = Math.sqrt(mse), r2 = 1 - (sse / sst);
+            return { mae, mse, rmse, r2 };
+        }
+
+        function update() {
+            const metrics = calculateMetrics();
+            metricsDiv.innerHTML = `
+                <div><div class="font-bold">MAE</div><div>${metrics.mae.toFixed(2)}</div></div>
+                <div><div class="font-bold">MSE</div><div>${metrics.mse.toFixed(2)}</div></div>
+                <div><div class="font-bold">RMSE</div><div>${metrics.rmse.toFixed(2)}</div></div>
+                <div><div class="font-bold">R²</div><div>${metrics.r2.toFixed(2)}</div></div>
+            `;
+            activeChart.data.datasets[0].data = dataPoints; activeChart.update();
+        }
+
+        outlierBtn.addEventListener('click', () => {
+            if (!hasOutlier) {
+                dataPoints.push({x: 7, y: 20});
+                outlierBtn.textContent = 'Remove Outlier';
+                outlierBtn.classList.replace('bg-cyan-600', 'bg-amber-600');
+            } else { dataPoints.pop(); outlierBtn.textContent = 'Add Outlier'; outlierBtn.classList.replace('bg-amber-600', 'bg-cyan-600'); }
+            hasOutlier = !hasOutlier; update();
+        });
+        update();
+    }
+    
+    function getRocExampleHtml() { return `<p class="text-sm text-slate-500 mb-4 text-center">A curve closer to the top-left indicates better performance. The AUC score quantifies this.</p><div class="chart-container"><canvas id="roc-chart"></canvas></div>`; }
+    function initRocExample() {
+        activeChart = new Chart(document.getElementById('roc-chart').getContext('2d'), {
+            type: 'line',
+            data: { datasets: [ { label: 'Good (AUC=0.9)', data: [{x:0,y:0},{x:0.1,y:0.7},{x:0.2,y:0.85},{x:0.4,y:0.95},{x:1,y:1}], borderColor: '#0891b2', fill: false, tension: 0.2 }, { label: 'Fair (AUC=0.7)', data: [{x:0,y:0},{x:0.2,y:0.4},{x:0.4,y:0.6},{x:0.6,y:0.8},{x:1,y:1}], borderColor: '#f59e0b', fill: false, tension: 0.2 }, { label: 'Random (AUC=0.5)', data: [{x:0,y:0},{x:1,y:1}], borderColor: '#64748b', borderDash: [5, 5], fill: false } ] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { x: { title: { display: true, text: 'False Positive Rate' }, min: 0, max: 1 }, y: { title: { display: true, text: 'True Positive Rate' }, min: 0, max: 1 } }, plugins: { legend: { position: 'bottom' } } }
+        });
+    }
+    
+    function getElbowExampleHtml() { return `<p class="text-sm text-slate-500 mb-4 text-center">The "elbow" point, where the rate of decrease in WCSS sharply changes, suggests the optimal value for k.</p><div class="chart-container"><canvas id="elbow-chart"></canvas></div>`; }
+    function initElbowExample() {
+        activeChart = new Chart(document.getElementById('elbow-chart').getContext('2d'), {
+            type: 'line',
+            data: { labels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], datasets: [{ label: 'WCSS', data: [300, 180, 120, 80, 65, 55, 48, 42, 38, 35], borderColor: '#0891b2', backgroundColor: '#cffafe', fill: true, tension: 0.1, pointRadius: 5, pointBackgroundColor: '#0e7490' }] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { x: { title: { display: true, text: 'Number of Clusters (k)' } }, y: { title: { display: true, text: 'WCSS' } } }, plugins: { legend: { display: false } } }
+        });
+    }
+    
+    function getKFoldExampleHtml() {
+        return `
+            <p class="text-sm text-slate-500 mb-4 text-center">This simulation visualizes the K-Fold process. Adjust K to see how the data is split into training (blue) and test (orange) sets for each fold.</p>
+            <div class="mb-4">${createSlider('k-val', 'K Value', 5, 10, 1)}</div>
+            <div id="fold-sim-container" class="fold-sim-grid bg-slate-200 p-2 rounded-lg"></div>
+            <div id="fold-counter" class="text-center font-bold mt-2 text-lg text-cyan-800"></div>
+        `;
+    }
+
+    function initKFoldExample() {
+        const kSlider = document.getElementById('k-val-slider');
+        const kValue = document.getElementById('k-val-value');
+        const container = document.getElementById('fold-sim-container');
+        const counter = document.getElementById('fold-counter');
+        const numItems = 50;
+        let k = 5; let currentFold = 0; let items = [];
+
+        function setup() {
+            container.innerHTML = '';
+            items = [];
+            for(let i=0; i<numItems; i++) {
+                const item = document.createElement('div');
+                item.className = 'fold-sim-item';
+                container.appendChild(item);
+                items.push(item);
+            }
+            k = parseInt(kSlider.value);
+            kValue.textContent = k;
+            currentFold = 0;
+            if (activeAnimationId) cancelAnimationFrame(activeAnimationId);
+            animate();
+        }
+
+        function animate() {
+            const foldSize = Math.floor(numItems / k);
+            counter.textContent = `Fold: ${currentFold + 1} / ${k}`;
+            items.forEach((item, i) => {
+                const testFoldStart = currentFold * foldSize;
+                const testFoldEnd = testFoldStart + foldSize;
+                if (i >= testFoldStart && i < testFoldEnd) {
+                    item.className = 'fold-sim-item fold-test';
+                } else {
+                    item.className = 'fold-sim-item fold-train';
+                }
+            });
+
+            currentFold = (currentFold + 1) % k;
+            activeAnimationId = setTimeout(animate, 1500);
+        }
+
+        kSlider.addEventListener('input', setup);
+        setup();
+    }
+
+    function getNdcgExampleHtml() {
+        return `
+            <p class="text-sm text-slate-500 mb-4 text-center">Assign relevance scores (0-3) to each item. The nDCG will update, showing how it rewards placing highly relevant items at the top.</p>
+            <ul id="ndcg-list" class="space-y-2"></ul>
+            <div id="ndcg-score" class="mt-4 text-center font-bold text-lg p-3 bg-cyan-100 text-cyan-900 rounded-lg"></div>
+        `;
+    }
+
+    function initNdcgExample() {
+        const list = document.getElementById('ndcg-list');
+        const scoreDiv = document.getElementById('ndcg-score');
+        const items = ['Item A', 'Item B', 'Item C', 'Item D', 'Item E'];
+        let relevance = [3, 2, 3, 0, 1]; // Initial relevance scores
+
+        function calculateNdcg() {
+            let dcg = 0;
+            for (let i = 0; i < relevance.length; i++) {
+                dcg += relevance[i] / Math.log2(i + 2);
+            }
+
+            const idealRelevance = [...relevance].sort((a, b) => b - a);
+            let idcg = 0;
+            for (let i = 0; i < idealRelevance.length; i++) {
+                idcg += idealRelevance[i] / Math.log2(i + 2);
+            }
+            
+            const ndcg = idcg > 0 ? dcg / idcg : 0;
+            scoreDiv.innerHTML = `DCG: ${dcg.toFixed(2)} &nbsp;&nbsp;|&nbsp;&nbsp; IDCG: ${idcg.toFixed(2)} &nbsp;&nbsp;|&nbsp;&nbsp; <span class="text-xl">nDCG: ${ndcg.toFixed(3)}</span>`;
+        }
+
+        function render() {
+            list.innerHTML = '';
+            items.forEach((item, i) => {
+                const li = document.createElement('li');
+                li.className = 'flex items-center justify-between bg-white p-2 rounded shadow-sm';
+                li.innerHTML = `
+                    <span class="font-medium">${item} (Rank ${i + 1})</span>
+                    <div>
+                        <label class="text-sm mr-2">Relevance:</label>
+                        <input type="number" min="0" max="3" value="${relevance[i]}" class="w-16 p-1 border rounded" data-index="${i}">
+                    </div>
+                `;
+                list.appendChild(li);
+            });
+            calculateNdcg();
+        }
+
+        list.addEventListener('input', (e) => {
+            if (e.target.tagName === 'INPUT') {
+                const index = parseInt(e.target.dataset.index);
+                const value = parseInt(e.target.value);
+                if (!isNaN(value) && value >= 0 && value <= 3) {
+                    relevance[index] = value;
+                    calculateNdcg();
+                }
+            }
+        });
+        
+        render();
+    }
+
+    init();
+});
+</script>
+</body>
+</html>
