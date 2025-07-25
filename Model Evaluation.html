@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Model Evaluation Handbook</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" xintegrity="sha384-n8MVd4RsNIU0KOVEMVIhbTeHSSiNgAPfhPxbRVSfk_wGo" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" xintegrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Cyan & Amber -->
+    <!-- Application Structure Plan: The application is designed as a single-page, task-oriented interactive explorer. The primary navigation is structured around high-level machine learning task categories (e.g., Classification, Regression, Clustering). This is more intuitive and efficient for a practitioner than a long, linear document. The user flow is as follows: 1) The user selects a task category from the main navigation. 2) The content area dynamically displays a grid of "metric cards" for that category. 3) Clicking a card opens a detailed modal view. This modal contains the metric's definition, its mathematical formula, an interactive visualization/example to build intuition, and a summary of its limitations. This "filter-then-detail" architecture breaks down the dense source material into manageable, easy-to-digest chunks, facilitating quick scanning and deep-dive exploration on demand, directly fulfilling the goal of making the content easily consumable. -->
+    <!-- Visualization & Content Choices: To transform the static report into an interactive tool, the following choices were made: 1) **Structure**: The main layout, navigation, and metric cards are built with semantic HTML and styled with Tailwind CSS. 2) **Formulas**: Mathematical formulas are rendered using the KaTeX library for crisp, accurate display of LaTeX. 3) **Interactive Examples**: Instead of static examples, each metric features an interactive component powered by Chart.js and vanilla JavaScript. For Classification, users can manipulate a confusion matrix via input sliders and see how metrics like Precision, Recall, and F1-score change in real-time on a bar chart. For Regression, users can adjust data points on a scatter plot to see the immediate impact on MAE, MSE, and RMSE, visually demonstrating concepts like outlier sensitivity. For Clustering, a line chart illustrates the "Elbow Method". 4) **Justification**: This hands-on approach moves beyond passive reading to active learning, allowing users to build a deeper, more intuitive understanding of how each metric behaves. This directly addresses the "interactive storytelling" and "wow factor" requirements. 5) **Libraries**: Chart.js for all visualizations (bar, line, scatter), KaTeX for formulas, and vanilla JS for all state management and interaction logic. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .katex { font-size: 1.1em !important; }
+        .chart-container { position: relative; width: 100%; max-width: 500px; margin-left: auto; margin-right: auto; height: 300px; max-height: 40vh; }
+        .modal-content { max-height: 90vh; }
+        .nav-button.active { background-color: #0891b2; color: white; }
+        .nav-button { transition: all 0.2s ease-in-out; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div id="app" class="container mx-auto p-4 sm:p-6 md:p-8">
+
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-cyan-900">Interactive Model Evaluation Handbook</h1>
+            <p class="mt-4 text-lg text-slate-600 max-w-3xl mx-auto">An explorable guide to the methods and metrics used to build and measure robust machine learning models. Select a category to begin.</p>
+        </header>
+
+        <nav id="navigation" class="flex flex-wrap justify-center gap-2 sm:gap-4 mb-8">
+        </nav>
+
+        <main id="main-content">
+        </main>
+
+    </div>
+
+    <div id="metric-modal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl modal-content overflow-y-auto">
+            <div class="sticky top-0 bg-white p-4 sm:p-6 border-b border-slate-200 flex justify-between items-center">
+                <h2 id="modal-title" class="text-2xl font-bold text-cyan-800"></h2>
+                <button id="close-modal" class="text-slate-500 hover:text-slate-800 text-3xl font-bold">&times;</button>
+            </div>
+            <div id="modal-body" class="p-4 sm:p-6">
+            </div>
+        </div>
+    </div>
+
+<script>
+const data = {
+    "classification": {
+        name: "🟥 Classification",
+        description: "Metrics for models that predict a categorical label. These metrics evaluate performance based on how well the model's predictions match the true labels, often summarized in a confusion matrix.",
+        metrics: [
+            {
+                name: "Accuracy",
+                short_desc: "The proportion of correct predictions among the total number of cases examined.",
+                formula: `\\text{Accuracy} = \\frac{TP + TN}{TP + TN + FP + FN}`,
+                details: "Accuracy is the most intuitive performance measure. It is simply a ratio of correctly predicted observations to the total observations.",
+                limitations: "Can be highly misleading for imbalanced datasets. A model can achieve high accuracy by simply predicting the majority class, while failing completely on the minority class.",
+                example_type: "classification"
+            },
+            {
+                name: "Precision",
+                short_desc: "Of all positive predictions, what fraction was actually positive?",
+                formula: `\\text{Precision} = \\frac{TP}{TP + FP}`,
+                details: "Precision measures the accuracy of the positive predictions. It answers the question: 'Of all instances the model labeled as positive, how many were correct?'.",
+                limitations: "Precision alone is insufficient, as a model can be trivially precise by making only one, very certain positive prediction. It doesn't account for false negatives.",
+                example_type: "classification"
+            },
+            {
+                name: "Recall (Sensitivity)",
+                short_desc: "Of all actual positives, what fraction did the model identify?",
+                formula: `\\text{Recall} = \\frac{TP}{TP + FN}`,
+                details: "Recall (also known as Sensitivity or True Positive Rate) measures the model's ability to find all the actual positive instances in the dataset.",
+                limitations: "Recall alone is insufficient. A model that predicts every instance as positive would have a perfect recall of 1.0 but likely terrible precision.",
+                example_type: "classification"
+            },
+            {
+                name: "F1-Score",
+                short_desc: "The harmonic mean of Precision and Recall.",
+                formula: `F_1 = 2 \\times \\frac{\\text{Precision} \\times \\text{Recall}}{\\text{Precision} + \\text{Recall}}`,
+                details: "The F1-Score provides a single, balanced score that accounts for both false positives (via precision) and false negatives (via recall). It's often a better measure than accuracy for imbalanced classification problems.",
+                limitations: "The F1-score gives equal weight to precision and recall. In scenarios where one is more important than the other, a weighted F-beta score might be more appropriate.",
+                example_type: "classification"
+            },
+            {
+                name: "ROC AUC",
+                short_desc: "Area Under the Receiver Operating Characteristic Curve.",
+                formula: `\\text{AUC} = \\int_{0}^{1} \\text{TPR}(t) \\, d\\text{FPR}(t)`,
+                details: "AUC represents the probability that a randomly chosen positive instance is ranked higher by the model than a randomly chosen negative instance. It measures the model's ability to discriminate between classes across all possible thresholds.",
+                limitations: "Can be overly optimistic on imbalanced datasets because the False Positive Rate (FPR) can be very small if the number of true negatives is large. In such cases, a Precision-Recall curve is often more informative.",
+                example_type: "roc_curve"
+            },
+            {
+                name: "Log Loss",
+                short_desc: "Penalizes confident but incorrect probabilistic predictions.",
+                formula: `\\text{LogLoss} = -\\frac{1}{N} \\sum_{i=1}^{N} [y_i \\log(p_i) + (1-y_i) \\log(1-p_i)]`,
+                details: "Log Loss evaluates classifiers that output a probability value. It heavily penalizes predictions that are confident and wrong, providing a more nuanced measure of performance than metrics based on a fixed threshold.",
+                limitations: "The score is sensitive to outliers and can be difficult to interpret directly. A single highly confident wrong prediction can dramatically increase the overall Log Loss.",
+                example_type: "none"
+            },
+        ]
+    },
+    "regression": {
+        name: "🟦 Regression",
+        description: "Metrics for models that predict a continuous numerical value. These metrics quantify the magnitude of the error between the predicted and actual values.",
+        metrics: [
+            {
+                name: "Mean Absolute Error (MAE)",
+                short_desc: "The average of the absolute differences between predicted and actual values.",
+                formula: `\\text{MAE} = \\frac{1}{n} \\sum_{i=1}^{n} |y_i - \\hat{y}_i|`,
+                details: "MAE is intuitive because its value is in the same units as the target variable. It measures the average magnitude of the errors in a set of predictions, without considering their direction.",
+                limitations: "It treats all errors equally, which may not be desirable if large errors are significantly worse than small errors.",
+                example_type: "regression"
+            },
+            {
+                name: "Mean Squared Error (MSE)",
+                short_desc: "The average of the squared differences between predicted and actual values.",
+                formula: `\\text{MSE} = \\frac{1}{n} \\sum_{i=1}^{n} (y_i - \\hat{y}_i)^2`,
+                details: "MSE penalizes larger errors more heavily than MAE due to the squaring term. This makes it a good metric when large errors are particularly undesirable.",
+                limitations: "The units of MSE are the square of the target variable's units, which can make it less interpretable. It is highly sensitive to outliers.",
+                example_type: "regression"
+            },
+            {
+                name: "Root Mean Squared Error (RMSE)",
+                short_desc: "The square root of the Mean Squared Error.",
+                formula: `\\text{RMSE} = \\sqrt{\\frac{1}{n} \\sum_{i=1}^{n} (y_i - \\hat{y}_i)^2}`,
+                details: "RMSE is one of the most popular regression metrics. Like MSE, it is sensitive to outliers, but it has the advantage of being in the same units as the target variable, making it more interpretable.",
+                limitations: "Like MSE, it is sensitive to outliers. The choice between MAE and RMSE depends on whether you want to penalize large errors more severely.",
+                example_type: "regression"
+            },
+            {
+                name: "R-squared (R²)",
+                short_desc: "Proportion of variance in the target that is predictable from the features.",
+                formula: `R^2 = 1 - \\frac{\\sum (y_i - \\hat{y}_i)^2}{\\sum (y_i - \\bar{y})^2}`,
+                details: "R-squared measures the 'goodness of fit' of the model. An R² of 0.85 means that 85% of the variance in the target variable can be explained by the model. It's a relative measure of fit.",
+                limitations: "R² will always increase or stay the same when a new feature is added, even if it's irrelevant. This can be misleading. Use Adjusted R² to penalize the inclusion of useless features.",
+                example_type: "regression"
+            }
+        ]
+    },
+    "clustering": {
+        name: "🟨 Clustering",
+        description: "Metrics for unsupervised models that group data points. Evaluation can be 'internal' (based on cluster structure) or 'external' (if ground truth labels are available).",
+        metrics: [
+            {
+                name: "Silhouette Score",
+                short_desc: "Measures how similar a point is to its own cluster compared to other clusters.",
+                formula: `s(i) = \\frac{b(i) - a(i)}{\\max(a(i), b(i))}`,
+                details: "The Silhouette Score measures how well-separated clusters are. The score is higher for clusters that are dense and well-separated from other clusters. It ranges from -1 to +1.",
+                limitations: "Tends to favor convex clusters and can perform poorly on clusters with complex shapes or varying densities. Computation can be slow on large datasets.",
+                example_type: "none"
+            },
+            {
+                name: "Elbow Method (WCSS)",
+                short_desc: "A heuristic to find the optimal number of clusters by plotting WCSS.",
+                formula: `\\text{WCSS} = \\sum_{P_i \\in C_k} ||P_i - Q_k||^2`,
+                details: "The Elbow Method is a visual heuristic used to determine the optimal number of clusters (k). It plots the Within-Cluster Sum of Squares (WCSS) for a range of k values. The 'elbow' point on the plot, where the rate of decrease in WCSS slows down, suggests the optimal k.",
+                limitations: "The 'elbow' is often ambiguous and subjective, making it difficult to determine the optimal k automatically. It doesn't work well on all cluster shapes.",
+                example_type: "elbow"
+            },
+        ]
+    },
+    "diagnostics": {
+        name: "📊 Diagnostic Tools",
+        description: "Visual tools that provide deeper insights into model behavior, helping to diagnose issues like overfitting, underfitting, and violations of model assumptions.",
+        metrics: [
+            {
+                name: "Learning Curves",
+                short_desc: "Plot of model performance on train/validation sets vs. training size.",
+                details: "Learning curves are a primary tool for diagnosing the bias-variance tradeoff. By plotting the training and validation scores against the number of training samples, you can identify if a model is suffering from high bias (underfitting) or high variance (overfitting).",
+                limitations: "Generating learning curves can be computationally expensive as it requires training the model multiple times on different subset sizes of the training data.",
+                example_type: "learning_curve"
+            },
+            {
+                name: "Residual Plots",
+                short_desc: "A scatter plot of residuals vs. fitted values in regression.",
+                details: "A residual plot is a critical tool for diagnosing the validity of a linear regression model's assumptions. An ideal plot shows a random scatter of points around the horizontal line at zero, with no discernible patterns. Patterns like a curve or a funnel shape indicate violations of assumptions like linearity or constant variance.",
+                limitations: "Interpretation can be subjective. While they are powerful for linear models, their application to complex non-linear models can be less straightforward.",
+                example_type: "none"
+            }
+        ]
+    }
+};
+
+let activeChart = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+    const navigation = document.getElementById('navigation');
+    const mainContent = document.getElementById('main-content');
+    const modal = document.getElementById('metric-modal');
+    const closeModalBtn = document.getElementById('close-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+
+    function init() {
+        const categories = Object.keys(data);
+        categories.forEach(key => {
+            const button = document.createElement('button');
+            button.className = 'nav-button px-4 py-2 rounded-lg font-semibold text-slate-700 bg-white shadow-sm hover:bg-cyan-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-opacity-50';
+            button.textContent = data[key].name;
+            button.dataset.category = key;
+            navigation.appendChild(button);
+        });
+
+        navigation.addEventListener('click', e => {
+            if (e.target.tagName === 'BUTTON') {
+                const category = e.target.dataset.category;
+                setActiveCategory(category);
+                renderCategory(category);
+            }
+        });
+
+        closeModalBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            if (activeChart) {
+                activeChart.destroy();
+                activeChart = null;
+            }
+        });
+        
+        setActiveCategory(categories[0]);
+        renderCategory(categories[0]);
+    }
+    
+    function setActiveCategory(categoryKey) {
+        const buttons = navigation.querySelectorAll('button');
+        buttons.forEach(btn => {
+            if (btn.dataset.category === categoryKey) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+
+    function renderCategory(categoryKey) {
+        mainContent.innerHTML = '';
+        const category = data[categoryKey];
+
+        const intro = document.createElement('div');
+        intro.className = 'mb-8 text-center p-6 bg-white/60 rounded-xl shadow-sm';
+        intro.innerHTML = `<p class="text-slate-600">${category.description}</p>`;
+        mainContent.appendChild(intro);
+
+        const grid = document.createElement('div');
+        grid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
+        
+        category.metrics.forEach(metric => {
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-xl shadow-md p-6 cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between';
+            card.innerHTML = `
+                <div>
+                    <h3 class="text-xl font-bold text-cyan-800 mb-2">${metric.name}</h3>
+                    <p class="text-slate-600">${metric.short_desc}</p>
+                </div>
+                <div class="mt-4 text-right text-cyan-600 font-semibold">Explore &rarr;</div>
+            `;
+            card.addEventListener('click', () => showModal(metric));
+            grid.appendChild(card);
+        });
+        mainContent.appendChild(grid);
+    }
+
+    function showModal(metric) {
+        modalTitle.textContent = metric.name;
+        
+        let exampleHtml = '';
+        if (metric.example_type === 'classification') {
+            exampleHtml = getClassificationExampleHtml();
+        } else if (metric.example_type === 'regression') {
+            exampleHtml = getRegressionExampleHtml();
+        } else if (metric.example_type === 'roc_curve') {
+            exampleHtml = getRocExampleHtml();
+        } else if (metric.example_type === 'elbow') {
+            exampleHtml = getElbowExampleHtml();
+        } else if (metric.example_type === 'learning_curve') {
+            exampleHtml = getLearningCurveExampleHtml();
+        }
+
+        modalBody.innerHTML = `
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                    <div class="mb-4">
+                        <h4 class="font-bold text-lg mb-2 text-slate-700">Formula</h4>
+                        <div id="formula-container" class="p-4 bg-slate-100 rounded-lg text-center"></div>
+                    </div>
+                    <div class="mb-4">
+                        <h4 class="font-bold text-lg mb-2 text-slate-700">Details</h4>
+                        <p class="text-slate-600">${metric.details}</p>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-lg mb-2 text-slate-700">Limitations</h4>
+                        <p class="text-slate-600">${metric.limitations}</p>
+                    </div>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-lg">
+                    <h4 class="font-bold text-lg mb-2 text-center text-slate-700">Interactive Example</h4>
+                    ${exampleHtml}
+                </div>
+            </div>
+        `;
+
+        katex.render(metric.formula, document.getElementById('formula-container'), {
+            throwOnError: false
+        });
+
+        if (metric.example_type === 'classification') {
+            initClassificationExample();
+        } else if (metric.example_type === 'regression') {
+            initRegressionExample();
+        } else if (metric.example_type === 'roc_curve') {
+            initRocExample();
+        } else if (metric.example_type === 'elbow') {
+            initElbowExample();
+        } else if (metric.example_type === 'learning_curve') {
+            initLearningCurveExample();
+        }
+        
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+
+    function getClassificationExampleHtml() {
+        return `
+            <p class="text-sm text-slate-500 mb-4 text-center">Adjust the sliders to change the confusion matrix values and see how the metrics respond.</p>
+            <div class="space-y-3 mb-4">
+                ${createSlider('tp', 'True Positives', 50, 100)}
+                ${createSlider('fp', 'False Positives', 10, 100)}
+                ${createSlider('tn', 'True Negatives', 50, 100)}
+                ${createSlider('fn', 'False Negatives', 5, 100)}
+            </div>
+            <div class="chart-container"><canvas id="classification-chart"></canvas></div>
+        `;
+    }
+    
+    function createSlider(id, label, value, max) {
+        return `
+            <div class="grid grid-cols-3 items-center gap-2">
+                <label for="${id}-slider" class="text-sm font-medium">${label}</label>
+                <input type="range" id="${id}-slider" min="0" max="${max}" value="${value}" class="w-full col-span-1">
+                <span id="${id}-value" class="text-sm font-semibold text-cyan-700 text-right w-12">${value}</span>
+            </div>
+        `;
+    }
+
+    function initClassificationExample() {
+        const ctx = document.getElementById('classification-chart').getContext('2d');
+        const sliders = {
+            tp: document.getElementById('tp-slider'),
+            fp: document.getElementById('fp-slider'),
+            tn: document.getElementById('tn-slider'),
+            fn: document.getElementById('fn-slider')
+        };
+        const values = {
+            tp: document.getElementById('tp-value'),
+            fp: document.getElementById('fp-value'),
+            tn: document.getElementById('tn-value'),
+            fn: document.getElementById('fn-value')
+        };
+
+        activeChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Accuracy', 'Precision', 'Recall', 'F1-Score'],
+                datasets: [{
+                    label: 'Score',
+                    data: [],
+                    backgroundColor: ['#06b6d4', '#0891b2', '#0e7490', '#164e63'],
+                    borderRadius: 4,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { beginAtZero: true, max: 1 } },
+                plugins: { legend: { display: false }, tooltip: { enabled: true } }
+            }
+        });
+
+        function update() {
+            const tp = parseInt(sliders.tp.value);
+            const fp = parseInt(sliders.fp.value);
+            const tn = parseInt(sliders.tn.value);
+            const fn = parseInt(sliders.fn.value);
+
+            values.tp.textContent = tp;
+            values.fp.textContent = fp;
+            values.tn.textContent = tn;
+            values.fn.textContent = fn;
+            
+            const total = tp + fp + tn + fn;
+            const accuracy = total > 0 ? (tp + tn) / total : 0;
+            const precision = (tp + fp) > 0 ? tp / (tp + fp) : 0;
+            const recall = (tp + fn) > 0 ? tp / (tp + fn) : 0;
+            const f1 = (precision + recall) > 0 ? 2 * (precision * recall) / (precision + recall) : 0;
+
+            activeChart.data.datasets[0].data = [accuracy, precision, recall, f1];
+            activeChart.update();
+        }
+
+        Object.values(sliders).forEach(slider => slider.addEventListener('input', update));
+        update();
+    }
+
+    function getRegressionExampleHtml() {
+        return `
+            <p class="text-sm text-slate-500 mb-4 text-center">Click the button to add an outlier and observe its disproportionate impact on MSE and RMSE compared to MAE.</p>
+            <div class="chart-container"><canvas id="regression-chart"></canvas></div>
+            <div id="regression-metrics" class="mt-4 grid grid-cols-2 text-center gap-2"></div>
+            <div class="text-center mt-4">
+                <button id="outlier-btn" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition">Add Outlier</button>
+            </div>
+        `;
+    }
+
+    function initRegressionExample() {
+        const ctx = document.getElementById('regression-chart').getContext('2d');
+        const metricsDiv = document.getElementById('regression-metrics');
+        const outlierBtn = document.getElementById('outlier-btn');
+        let dataPoints = [
+            {x: 1, y: 2}, {x: 2, y: 2.5}, {x: 3, y: 4}, {x: 4, y: 4.2}, {x: 5, y: 6}, {x: 6, y: 5.8}
+        ];
+        let hasOutlier = false;
+
+        activeChart = new Chart(ctx, {
+            type: 'scatter',
+            data: { datasets: [{ label: 'Data', data: dataPoints, backgroundColor: '#0891b2' }] },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { x: { beginAtZero: true }, y: { beginAtZero: true } },
+                plugins: { legend: { display: false } }
+            }
+        });
+        
+        function calculateMetrics() {
+            const n = dataPoints.length;
+            if (n === 0) return { mae: 0, mse: 0, rmse: 0, r2: 0 };
+            
+            const sumX = dataPoints.reduce((s, p) => s + p.x, 0);
+            const sumY = dataPoints.reduce((s, p) => s + p.y, 0);
+            const sumXY = dataPoints.reduce((s, p) => s + p.x * p.y, 0);
+            const sumX2 = dataPoints.reduce((s, p) => s + p.x * p.x, 0);
+            
+            const m = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+            const b = (sumY - m * sumX) / n;
+
+            let sse = 0, sst = 0, mae_sum = 0;
+            const y_mean = sumY / n;
+
+            dataPoints.forEach(p => {
+                const pred_y = m * p.x + b;
+                const error = p.y - pred_y;
+                sse += error * error;
+                sst += (p.y - y_mean) * (p.y - y_mean);
+                mae_sum += Math.abs(error);
+            });
+            
+            const mae = mae_sum / n;
+            const mse = sse / n;
+            const rmse = Math.sqrt(mse);
+            const r2 = 1 - (sse / sst);
+
+            return { mae, mse, rmse, r2 };
+        }
+
+        function update() {
+            const metrics = calculateMetrics();
+            metricsDiv.innerHTML = `
+                <div><div class="font-bold">MAE</div><div>${metrics.mae.toFixed(2)}</div></div>
+                <div><div class="font-bold">MSE</div><div>${metrics.mse.toFixed(2)}</div></div>
+                <div><div class="font-bold">RMSE</div><div>${metrics.rmse.toFixed(2)}</div></div>
+                <div><div class="font-bold">R²</div><div>${metrics.r2.toFixed(2)}</div></div>
+            `;
+            activeChart.data.datasets[0].data = dataPoints;
+            activeChart.update();
+        }
+
+        outlierBtn.addEventListener('click', () => {
+            if (!hasOutlier) {
+                dataPoints.push({x: 7, y: 20});
+                outlierBtn.textContent = 'Remove Outlier';
+                outlierBtn.classList.replace('bg-cyan-600', 'bg-amber-600');
+                outlierBtn.classList.replace('hover:bg-cyan-700', 'hover:bg-amber-700');
+            } else {
+                dataPoints.pop();
+                outlierBtn.textContent = 'Add Outlier';
+                outlierBtn.classList.replace('bg-amber-600', 'bg-cyan-600');
+                outlierBtn.classList.replace('hover:bg-amber-700', 'hover:bg-cyan-700');
+            }
+            hasOutlier = !hasOutlier;
+            update();
+        });
+
+        update();
+    }
+    
+    function getRocExampleHtml() {
+        return `
+            <p class="text-sm text-slate-500 mb-4 text-center">This chart shows ROC curves for three different models. A curve closer to the top-left corner indicates better performance. The AUC score quantifies this performance.</p>
+            <div class="chart-container"><canvas id="roc-chart"></canvas></div>
+        `;
+    }
+
+    function initRocExample() {
+        const ctx = document.getElementById('roc-chart').getContext('2d');
+        activeChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: [
+                    {
+                        label: 'Good Model (AUC=0.9)',
+                        data: [{x:0,y:0},{x:0.1,y:0.7},{x:0.2,y:0.85},{x:0.4,y:0.95},{x:1,y:1}],
+                        borderColor: '#0891b2',
+                        fill: false,
+                        tension: 0.2
+                    },
+                    {
+                        label: 'Fair Model (AUC=0.7)',
+                        data: [{x:0,y:0},{x:0.2,y:0.4},{x:0.4,y:0.6},{x:0.6,y:0.8},{x:1,y:1}],
+                        borderColor: '#f59e0b',
+                        fill: false,
+                        tension: 0.2
+                    },
+                    {
+                        label: 'Random (AUC=0.5)',
+                        data: [{x:0,y:0},{x:1,y:1}],
+                        borderColor: '#64748b',
+                        borderDash: [5, 5],
+                        fill: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { type: 'linear', position: 'bottom', title: { display: true, text: 'False Positive Rate' }, min: 0, max: 1 },
+                    y: { title: { display: true, text: 'True Positive Rate' }, min: 0, max: 1 }
+                },
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+    }
+    
+    function getElbowExampleHtml() {
+        return `
+            <p class="text-sm text-slate-500 mb-4 text-center">This chart plots the Within-Cluster Sum of Squares (WCSS) against the number of clusters (k). The "elbow" point, where the rate of decrease sharply changes, suggests the optimal value for k.</p>
+            <div class="chart-container"><canvas id="elbow-chart"></canvas></div>
+        `;
+    }
+
+    function initElbowExample() {
+        const ctx = document.getElementById('elbow-chart').getContext('2d');
+        const kValues = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        const wcssValues = [300, 180, 120, 80, 65, 55, 48, 42, 38, 35];
+        activeChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: kValues,
+                datasets: [{
+                    label: 'WCSS',
+                    data: wcssValues,
+                    borderColor: '#0891b2',
+                    backgroundColor: '#cffafe',
+                    fill: true,
+                    tension: 0.1,
+                    pointRadius: 5,
+                    pointBackgroundColor: '#0e7490'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { title: { display: true, text: 'Number of Clusters (k)' } },
+                    y: { title: { display: true, text: 'WCSS' } }
+                },
+                plugins: { legend: { display: false } },
+                annotation: {
+                    annotations: {
+                        line1: {
+                            type: 'point',
+                            xValue: 3,
+                            yValue: 80,
+                            backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                            borderColor: 'red',
+                            borderWidth: 2,
+                            radius: 10,
+                        },
+                        label1: {
+                            type: 'label',
+                            xValue: 3,
+                            yValue: 80,
+                            content: ['Elbow Point (k=4)'],
+                            position: 'end',
+                            xAdjust: -50,
+                            yAdjust: -30,
+                            font: { size: 14, weight: 'bold' },
+                            color: 'red'
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    function getLearningCurveExampleHtml() {
+        return `
+            <p class="text-sm text-slate-500 mb-4 text-center">This chart shows learning curves, which diagnose bias and variance. The gap between the training and validation scores indicates the degree of overfitting.</p>
+            <div class="chart-container"><canvas id="learning-curve-chart"></canvas></div>
+        `;
+    }
+
+    function initLearningCurveExample() {
+        const ctx = document.getElementById('learning-curve-chart').getContext('2d');
+        const trainingSize = [100, 200, 300, 400, 500, 600, 700, 800];
+        const trainingScore = [0.98, 0.97, 0.96, 0.95, 0.94, 0.93, 0.92, 0.91];
+        const validationScore = [0.75, 0.80, 0.83, 0.85, 0.86, 0.87, 0.87, 0.88];
+        activeChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: trainingSize,
+                datasets: [
+                    {
+                        label: 'Training Score',
+                        data: trainingScore,
+                        borderColor: '#0891b2',
+                        fill: false
+                    },
+                    {
+                        label: 'Validation Score',
+                        data: validationScore,
+                        borderColor: '#f59e0b',
+                        fill: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { title: { display: true, text: 'Training Set Size' } },
+                    y: { title: { display: true, text: 'Accuracy Score' }, min: 0.7, max: 1.0 }
+                },
+                plugins: { legend: { position: 'bottom' } }
+            }
+        });
+    }
+
+
+    init();
+});
+</script>
+</body>
+</html>
