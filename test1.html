@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exhaustive Interactive Model Evaluation Handbook</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0KOVEMVIhbTeHSSiNgAPfhPxbRVSfk_wGo" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Cyan & Amber -->
+    <!-- Application Structure Plan: The application is designed as a single-page, task-oriented interactive explorer. The primary navigation is structured around high-level machine learning task categories (e.g., Classification, Regression, Clustering). This is more intuitive and efficient for a practitioner than a long, linear document. The user flow is as follows: 1) The user selects a task category from the main navigation. 2) The content area dynamically displays a grid of "metric cards" for that category. 3) Clicking a card opens a detailed modal view. This modal contains the metric's definition, its mathematical formula, an interactive visualization/example to build intuition, and a summary of its limitations. This "filter-then
+
+-detail" architecture breaks down the dense source material into manageable, easy-to-digest chunks, facilitating quick scanning and deep-dive exploration on demand, directly fulfilling the goal of making the content easily consumable. -->
+    <!-- Visualization & Content Choices: To transform the static report into an interactive tool, the following choices were made: 1) **Structure**: The main layout, navigation, and metric cards are built with semantic HTML and styled with Tailwind CSS. 2) **Formulas**: Mathematical formulas are rendered using the KaTeX library for crisp, accurate display of LaTeX. 3) **Interactive Examples**: Instead of static examples, each metric features an interactive component powered by Chart.js and vanilla JavaScript. For Classification, users can manipulate a confusion matrix via input sliders and see how metrics like Precision, Recall, and F1-score change in real-time on a bar chart. For Regression, users can adjust data points on a scatter plot to see the immediate impact on MAE, MSE, and RMSE, visually demonstrating concepts like outlier sensitivity. For Clustering, a line chart illustrates the "Elbow Method". For K-Fold CV, a visual simulation shows data splitting. For IoU, users can visually manipulate bounding boxes. 4) **Justification**: This hands-on approach moves beyond passive reading to active learning, allowing users to build a deeper, more intuitive understanding of how each metric behaves. This directly addresses the "interactive storytelling" and "wow factor" requirements. 5) **Libraries**: Chart.js for all visualizations (bar, line, scatter), KaTeX for formulas, and vanilla JS for all state management and interaction logic. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .katex-display { overflow-x: auto; overflow-y: auto; }
+        .chart-container { position: relative; width: 100%; max-width: 500px; margin: auto; height: 300px; max-height: 40vh; }
+        .modal-content { max-height: 90vh; }
+        .nav-button.active { background-color: #0891b2; color: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); }
+        .nav-button { transition: all 0.2s ease-in-out; }
+        .fold-sim-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; }
+        .fold-sim-item { width: 100%; padding-bottom: 100%; border-radius: 4px; transition: background-color 0.5s ease-in-out; }
+        .fold-train { background-color: #cffafe; border: 1px solid #0891b2; }
+        .fold-test { background-color: #f59e0b; border: 1px solid #b45309; }
+        .strat-class-0 { background-color: #bfdbfe; border: 1px solid #1d4ed8; }
+        .strat-class-1 { background-color: #fecaca; border: 1px solid #991b1b; }
+        .strat-test { opacity: 0.5; }
+        #iou-canvas { border: 1px solid #cbd5e1; border-radius: 0.5rem; background-color: #f8fafc; cursor: move; }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+
+    <div id="app" class="container mx-auto p-4 sm:p-6 md:p-8">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl md:text-5xl font-bold text-cyan-900">The Exhaustive Interactive Model Evaluation Handbook</h1>
+            <input type="text" id="search-input" placeholder="Search metrics..." class="w-full max-w-md mx-auto p-2 mt-4 border rounded-lg" aria-label="Search metrics">
+            <p class="mt-4 text-lg text-slate-600 max-w-3xl mx-auto">A comprehensive, explorable guide to the methods and metrics used to build and measure robust machine learning models. Select a category or search to begin.</p>
+        </header>
+        <nav id="navigation" class="flex flex-wrap justify-center gap-2 sm:gap-3 mb-10">
+        </nav>
+        <main id="main-content">
+        </main>
+    </div>
+
+    <div id="metric-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl modal-content overflow-y-auto">
+            <div class="sticky top-0 bg-white p-4 sm:p-6 border-b border-slate-200 flex justify-between items-center z-10">
+                <h2 id="modal-title" class="text-2xl font-bold text-cyan-800"></h2>
+                <button id="close-modal" class="text-slate-500 hover:text-slate-800 text-3xl font-bold" aria-label="Close modal">×</button>
+            </div>
+            <div id="modal-body" class="p-4 sm:p-6">
+            </div>
+        </div>
+    </div>
+
+<script>
+// Comprehensive data structure containing all metrics and their details
+const data = {
+    "validation": {
+        name: "🔁 Model Validation",
+        description: "Methods to generate reliable performance estimates and avoid pitfalls like overfitting. These techniques form the bedrock of robust machine learning practice.",
+        metrics: [
+            { name: "Train/Validation/Test Split", short_desc: "The fundamental strategy of splitting data to prevent information leakage.", details: "Partitioning data into three distinct subsets: Training (to fit the model), Validation (to tune hyperparameters), and Test (for a final, unbiased performance estimate). Typical splits are around 70%/15%/15%, but ratios may vary based on dataset size.", limitations: "Performance estimate can have high variance; it may depend heavily on which specific data points happened to fall into the validation split.", example_type: "none", formula: `\\text{Data} \\rightarrow \\text{Train (70%)} + \\text{Val (15%)} + \\text{Test (15%)}` },
+            { name: "K-Fold Cross-Validation", short_desc: "Averaging performance over multiple 'folds' to get a more stable estimate.", formula: `\\text{Score} = \\frac{1}{k} \\sum_{i=1}^{k} \\text{Metric}(\\text{Fold}_i)`, details: "The dataset is split into 'k' folds. The model is trained k times, each time using a different fold as the test set. The final score is the average of the scores from each fold.", limitations: "Can be biased for imbalanced datasets. Introduces a slight pessimistic bias as models are trained on slightly less data.", example_type: "kfold" },
+            { name: "Stratified K-Fold", short_desc: "A K-Fold variant that preserves class distribution in each fold.", details: "Ensures that each fold has the same percentage of samples of each class as the complete dataset. This is crucial for getting reliable estimates on imbalanced classification problems.", limitations: "Primarily applicable to classification tasks. Not suitable for data with inherent structure like time-series.", example_type: "stratified_kfold", formula: `P(\\text{class}_c | \\text{Fold}_i) \\approx P(\\text{class}_c | \\text{Data})` },
+            { name: "Leave-One-Out (LOOCV)", short_desc: "An exhaustive K-Fold where k equals the number of samples.", details: "A single data point is used as the test set, and the model is trained on the remaining n-1 points. This is repeated n times.", limitations: "Extremely high computational cost (trains n models) and the resulting performance estimate can have high variance.", example_type: "none", formula: `k=n` },
+            { name: "Group K-Fold", short_desc: "Ensures data from the same group isn't split between train and test sets.", details: "Crucial for datasets where observations are not independent (e.g., multiple readings from the same patient). It prevents data leakage by keeping all data from a specific group in either the training or the testing set.", limitations: "Requires predefined groups in the data. All samples from a group will be in the test set at once.", example_type: "none" },
+            { name: "TimeSeriesSplit", short_desc: "A rolling cross-validation strategy for time-ordered data.", details: "Creates folds that preserve the temporal order of observations. The training set expands to include more history, and the test set is always in the 'future' relative to the training set.", limitations: "The number of samples in the training set can vary significantly between folds.", example_type: "none" },
+            { name: "Nested Cross-Validation", short_desc: "A rigorous, two-level CV for unbiased hyperparameter tuning and evaluation.", details: "Uses an outer loop to split data for performance evaluation and an inner loop to perform hyperparameter tuning. This provides a more robust and unbiased estimate of the model's true generalization performance.", limitations: "Very high computational cost due to the nested loops.", example_type: "none" },
+            { name: "Bootstrap Resampling", short_desc: "Creating datasets by randomly sampling with replacement.", details: "Used to estimate uncertainty (confidence intervals) or in ensemble methods like Bagging. An out-of-bag (OOB) error estimate can be derived from samples not included in a specific bootstrap.", limitations: "The OOB estimate can be pessimistic as each model is trained on less unique data.", example_type: "none"},
+        ]
+    },
+    "classification": {
+        name: "🟥 Classification",
+        description: "Metrics for models that predict a categorical label, often summarized in a confusion matrix.",
+        metrics: [
+            { name: "Accuracy", short_desc: "The proportion of correct predictions among the total number of cases.", formula: `\\frac{TP + TN}{TP + TN + FP + FN}`, details: "The most intuitive performance measure. It is simply a ratio of correctly predicted observations to the total observations.", limitations: "Can be highly misleading for imbalanced datasets. A model can achieve high accuracy by simply predicting the majority class.", example_type: "classification" },
+            { name: "Precision", short_desc: "Of all positive predictions, what fraction was actually positive?", formula: `\\frac{TP}{TP + FP}`, details: "Measures the accuracy of the positive predictions. Critical when the cost of a False Positive is high (e.g., spam detection).", limitations: "Precision alone is insufficient, as a model can be trivially precise by making only one, very certain positive prediction.", example_type: "classification" },
+            { name: "Recall (Sensitivity)", short_desc: "Of all actual positives, what fraction did the model identify?", formula: `\\frac{TP}{TP + FN}`, details: "Measures the model's ability to find all the actual positive instances. Paramount when the cost of a False Negative is high (e.g., medical diagnosis).", limitations: "A model that predicts every instance as positive would have a perfect recall of 1.0 but likely terrible precision.", example_type: "classification" },
+            { name: "F-beta Score", short_desc: "The weighted harmonic mean of Precision and Recall.", formula: `(1 + \\beta^2) \\frac{\\text{Precision} \\times \\text{Recall}}{(\\beta^2 \\text{Precision}) + \\text{Recall}}`, details: "The F-beta score generalizes the F1-score, allowing you to give more weight to either precision or recall, controlled by the beta parameter. $\\beta > 1$ weights recall higher; $\\beta < 1$ weights precision higher.", limitations: "Choosing the correct beta requires a good understanding of the business problem and error costs.", example_type: "classification_fbeta" },
+            { name: "Specificity", short_desc: "Of all actual negatives, what fraction did the model identify?", formula: `\\frac{TN}{TN + FP}`, details: "Measures the model's ability to correctly identify all actual negative instances. Important when correctly identifying negatives is critical.", limitations: "Focuses only on the negative class performance.", example_type: "classification" },
+            { name: "Balanced Accuracy", short_desc: "The average of Recall (Sensitivity) and Specificity.", formula: `\\frac{\\text{Sensitivity} + \\text{Specificity}}{2}`, details: "Avoids inflated performance estimates on imbalanced datasets by giving equal weight to the performance on each class.", limitations: "Less common than F1-score but highly interpretable.", example_type: "classification" },
+            { name: "MCC", short_desc: "Matthews Correlation Coefficient, a balanced metric for imbalanced data.", formula: `\\frac{TP \\times TN - FP \\times FN}{\\sqrt{(TP+FP)(TP+FN)(TN+FP)(TN+FN)}}`, details: "A correlation coefficient between observed and predicted classifications. A score of +1 is perfect, 0 is random, and -1 is total disagreement. Useful for both balanced and imbalanced datasets.", limitations: "Less intuitive to explain than precision/recall, but often more robust.", example_type: "classification" },
+            { name: "Jaccard Index / IoU", short_desc: "Similarity between true and predicted positive sets.", formula: `J = \\frac{TP}{TP + FP + FN}`, details: "Measures the intersection over the union of the predicted and true positive sets. It is a measure of similarity. Identical to Intersection over Union (IoU) used in computer vision.", limitations: "Can be harsh on small disagreements. Less common for classification than F1.", example_type: "classification" },
+            { name: "G-Mean", short_desc: "Geometric mean of sensitivity and specificity.", formula: `\\sqrt{\\text{Sensitivity} \\times \\text{Specificity}}`, details: "Seeks to maximize the accuracy on each class while keeping these accuracies balanced. A low G-Mean indicates poor performance in at least one class.", limitations: "Highly sensitive to poor performance on either class; if either sensitivity or specificity is zero, G-Mean is zero.", example_type: "classification" },
+        ]
+    },
+    "probabilistic": {
+        name: "🔵 Probabilistic",
+        description: "Metrics for evaluating the quality and calibration of a model's predicted probabilities, not just its final class decisions.",
+        metrics: [
+            { name: "ROC AUC", short_desc: "Area Under the Receiver Operating Characteristic Curve.", formula: `\\int_{0}^{1} \\text{TPR}(t) \\, d\\text{FPR}(t)`, details: "AUC represents the probability that a randomly chosen positive instance is ranked higher by the model than a randomly chosen negative instance. It is threshold-independent.", limitations: "Can be overly optimistic on imbalanced datasets. In such cases, a Precision-Recall curve is often more informative.", example_type: "roc_curve" },
+            { name: "PR AUC (Average Precision)", short_desc: "Area Under the Precision-Recall Curve.", details: "PR curves are more informative than ROC curves when dealing with severely imbalanced datasets, as they focus on the performance on the minority positive class.", limitations: "There isn't a single standard way to calculate the area under the PR curve, which can lead to inconsistencies.", example_type: "none", formula: `\\text{AP} = \\sum_k (R_k - R_{k-1}) P_k` },
+            { name: "Log Loss", short_desc: "Penalizes confident but incorrect probabilistic predictions.", formula: `-\\frac{1}{N} \\sum [y_i \\log(p_i) + (1-y_i) \\log(1-p_i)]`, details: "Log Loss evaluates classifiers that output a probability value. It heavily penalizes predictions that are confident and wrong. Lower is better.", limitations: "The score is sensitive to outliers and can be difficult to interpret directly.", example_type: "none" },
+            { name: "Brier Score", short_desc: "Mean squared error between predicted probabilities and actual outcomes.", formula: `\\frac{1}{N} \\sum (p_i - y_i)^2`, details: "Measures both calibration and discrimination. A lower score is better, with 0 being a perfect score.", limitations: "Less intuitive than Log Loss for classification problems.", example_type: "none" },
+            { name: "Calibration Curve & ECE", short_desc: "Measures if predicted probabilities match true frequencies.", formula: `\\text{ECE} = \\sum_{m=1}^{M} \\frac{|B_m|}{n} |\\text{acc}(B_m) - \\text{conf}(B_m)|`, details: "A calibration curve plots true frequency against predicted probability. Expected Calibration Error (ECE) summarizes this plot into a single number. A lower ECE indicates better calibration.", limitations: "ECE is sensitive to the number of bins used in its calculation.", example_type: "calibration_curve" },
+            { name: "AIC / BIC", short_desc: "Akaike/Bayesian Information Criterion for model selection.", formula: `\\text{AIC} = 2k - 2\\ln(\\hat{L})`, details: "Information criteria that balance model fit (log-likelihood $\\hat{L}$) with model complexity (number of parameters $k$). Used for comparing models, not for absolute performance. Lower is better.", limitations: "Require calculating model likelihood and number of parameters. Not applicable to all model types (e.g., non-parametric).", example_type: "none" },
+        ]
+    },
+    "regression": {
+        name: "🟦 Regression",
+        description: "Metrics for models that predict a continuous numerical value. These metrics quantify the magnitude of the error between the predicted and actual values.",
+        metrics: [
+            { name: "Mean Absolute Error (MAE)", short_desc: "The average of the absolute differences between predicted and actual values.", formula: `\\frac{1}{n} \\sum |y_i - \\hat{y}_i|`, details: "MAE is intuitive and less sensitive to outliers than MSE.", limitations: "It treats all errors equally, which may not be desirable if large errors are significantly worse than small errors.", example_type: "regression" },
+            { name: "Mean Squared Error (MSE)", short_desc: "The average of the squared differences between predicted and actual values.", formula: `\\frac{1}{n} \\sum (y_i - \\hat{y}_i)^2`, details: "MSE penalizes larger errors more heavily than MAE. This is good when large errors are particularly undesirable.", limitations: "Units are squared, making it less interpretable. Highly sensitive to outliers.", example_type: "regression" },
+            { name: "Root Mean Squared Error (RMSE)", short_desc: "The square root of the Mean Squared Error.", formula: `\\sqrt{\\text{MSE}}`, details: "RMSE is very popular. It is sensitive to outliers but has the advantage of being in the same units as the target variable.", limitations: "The choice between MAE and RMSE depends on whether you want to penalize large errors more severely.", example_type: "regression" },
+            { name: "R-squared (R²)", short_desc: "Proportion of variance in the target that is predictable from the features.", formula: `1 - \\frac{\\sum (y_i - \\hat{y}_i)^2}{\\sum (y_i - \\bar{y})^2}`, details: "R-squared measures the 'goodness of fit' of the model. It's a relative measure of fit.", limitations: "R² will always increase when a new feature is added, even if it's irrelevant. Use Adjusted R² instead.", example_type: "regression" },
+            { name: "Median Absolute Error", short_desc: "Median of absolute errors, robust to outliers.", formula: `\\text{median}(|y_i - \\hat{y}_i|)`, details: "Because it uses the median, MedAE is highly robust to outliers. A few very large errors will not affect the score.", limitations: "Ignores the magnitude of errors beyond the median point.", example_type: "regression" },
+            { name: "sMAPE", short_desc: "Symmetric MAPE to address bias in standard MAPE.", formula: `\\frac{100\\%}{n} \\sum \\frac{| \\hat{y}_i - y_i |}{(|y_i| + |\\hat{y}_i|) / 2}`, details: "A scale-independent metric useful for comparing forecast accuracy. Attempts to fix issues with MAPE being undefined at zero.", limitations: "Can still be unstable when both actual and predicted values are close to zero.", example_type: "none" },
+            { name: "Quantile Loss", short_desc: "Asymmetric loss for quantile regression.", formula: `L_{\\tau}(y, \\hat{y})`, details: "Penalizes under-predictions and over-predictions differently based on the chosen quantile $\\tau$. Essential for applications where error costs are asymmetric, like inventory management.", limitations: "Requires specifying the quantile, which is problem-dependent.", example_type: "none" },
+        ]
+    },
+    "clustering": {
+        name: "🟨 Clustering",
+        description: "Metrics for unsupervised models that group data points. Evaluation can be 'internal' (based on cluster structure) or 'external' (if ground truth labels are available).",
+        metrics: [
+            { name: "Silhouette Score", short_desc: "Measures cluster cohesion vs. separation.", formula: `s = \\frac{b - a}{\\max(a, b)}`, details: "The score is higher for clusters that are dense and well-separated. Ranges from -1 (incorrect) to +1 (highly dense), with 0 indicating overlapping clusters.", limitations: "Tends to favor convex clusters and can perform poorly on clusters with complex shapes or varying density.", example_type: "silhouette" },
+            { name: "Davies-Bouldin Index", short_desc: "Ratio of within-cluster scatter to between-cluster separation.", formula: `DBI = \\frac{1}{k} \\sum \\max_{j \\neq i} (R_{ij})`, details: "Lower values indicate better clustering, with 0 being the optimal score. A lower score implies that clusters are more compact and well-separated.", limitations: "Like the Silhouette score, it generally works best for convex clusters.", example_type: "none" },
+            { name: "Calinski-Harabasz Index", short_desc: "Ratio of between-cluster dispersion to within-cluster dispersion.", formula: `\\frac{BSS / (k-1)}{WSS / (N-k)}`, details: "Also known as the Variance Ratio Criterion. A higher score generally indicates better-defined clusters (dense and well-separated).", limitations: "Tends to be higher for convex clusters.", example_type: "none" },
+            { name: "Elbow Method (WCSS)", short_desc: "A heuristic to find the optimal number of clusters by plotting WCSS.", formula: `\\text{WCSS} = \\sum_{P_i \\in C_k} ||P_i - Q_k||^2`, details: "Plots Within-Cluster Sum of Squares (WCSS) for a range of k values. The 'elbow' point on the plot, where the rate of decrease in WCSS slows down, suggests the optimal k.", limitations: "
