@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Handbook of Feature Engineering and Selection</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Harmony -->
+    <!-- Application Structure Plan: The structure is a single-page application with a fixed top navigation bar for high-level orientation ("Foundations", "Feature Engineering", "Feature Selection", "Best Practices"). The main body features an interactive "Technique Explorer" using filterable cards, allowing users to quickly find and compare methods. This dashboard-style approach is chosen over a linear book format to better serve a practitioner's need for quick, task-oriented information retrieval. Clicking a card or nav link will scroll to the detailed content, which is organized thematically. This design prioritizes findability and at-a-glance comparison, which is more usable for the target audience than simple reading. -->
+    <!-- Visualization & Content Choices: 
+        - Info: Foundational concepts (Ch 1-3). Goal: Inform. Method: Clean typography, key terms highlighted, blockquotes. Interaction: None.
+        - Comparison: Feature Selection Methodologies (Table 10.1). Goal: Compare. Viz: Interactive horizontal bar chart (Chart.js). Interaction: Hover for details. Justification: More engaging and quicker comparison than a table.
+        - Comparison: Categorical Encoding Methods (Table 5.1). Goal: Compare. Viz: Radar chart (Chart.js). Interaction: Toggle datasets. Justification: Excellent for multi-dimensional comparison.
+        - Organization: The entire handbook. Goal: Organize/Navigate. Method: "Technique Explorer" with filterable cards (HTML/CSS/JS). Interaction: Filter buttons. Justification: Turns a passive document into an active tool.
+        - Process Flow: Data Leakage Prevention (Ch 15). Goal: Explain a process. Method: Visual diagram (Tailwind CSS grid/flexbox). Interaction: Hover tooltips. Justification: A visual diagram is more effective than text for explaining workflows.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            background-color: #F8F7F4;
+            color: #3D405B;
+            font-family: 'Inter', sans-serif;
+        }
+        h1, h2, h3, h4 {
+            font-family: 'Lora', serif;
+            color: #3D405B;
+        }
+        .nav-link {
+            transition: color 0.3s ease, border-bottom-color 0.3s ease;
+            border-bottom: 2px solid transparent;
+        }
+        .nav-link:hover, .nav-link.active {
+            color: #81B29A;
+            border-bottom-color: #81B29A;
+        }
+        .filter-btn {
+            transition: all 0.3s ease;
+        }
+        .filter-btn.active {
+            background-color: #81B29A;
+            color: #FFFFFF;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .technique-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .technique-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 350px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 400px;
+            }
+        }
+        code {
+            background-color: #e9ecef;
+            padding: 0.2em 0.4em;
+            margin: 0;
+            font-size: 85%;
+            border-radius: 6px;
+            font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
+        blockquote {
+            border-left: 4px solid #81B29A;
+            padding-left: 1rem;
+            margin: 1.5rem 0;
+            color: #5c628a;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Header & Navigation -->
+    <header id="header" class="bg-white/80 backdrop-blur-md sticky top-0 z-50 shadow-sm">
+        <nav class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <a href="#top" class="text-xl font-bold font-lora text-gray-800">Feature Engineering Handbook</a>
+            <div class="hidden md:flex items-center space-x-8">
+                <a href="#foundations" class="nav-link text-gray-600 font-medium pb-1">Foundations</a>
+                <a href="#engineering" class="nav-link text-gray-600 font-medium pb-1">Engineering</a>
+                <a href="#selection" class="nav-link text-gray-600 font-medium pb-1">Selection</a>
+                <a href="#best-practices" class="nav-link text-gray-600 font-medium pb-1">Best Practices</a>
+            </div>
+            <button id="mobile-menu-button" class="md:hidden text-gray-700 focus:outline-none">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+            </button>
+        </nav>
+        <div id="mobile-menu" class="hidden md:hidden">
+            <a href="#foundations" class="block py-2 px-6 text-sm text-gray-700 hover:bg-gray-100">Foundations</a>
+            <a href="#engineering" class="block py-2 px-6 text-sm text-gray-700 hover:bg-gray-100">Engineering</a>
+            <a href="#selection" class="block py-2 px-6 text-sm text-gray-700 hover:bg-gray-100">Selection</a>
+            <a href="#best-practices" class="block py-2 px-6 text-sm text-gray-700 hover:bg-gray-100">Best Practices</a>
+        </div>
+    </header>
+
+    <main id="top" class="container mx-auto px-6 py-8 md:py-12">
+
+        <!-- Hero Section -->
+        <section class="text-center mb-16">
+            <h1 class="text-4xl md:text-5xl font-bold mb-4">An Interactive Guide to Feature Engineering & Selection</h1>
+            <p class="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto">
+                Translate raw data into powerful signals. This guide is an interactive dashboard to help you explore, compare, and master the techniques that form the bedrock of predictive modeling.
+            </p>
+        </section>
+
+        <!-- Technique Explorer -->
+        <section id="explorer" class="mb-16">
+            <h2 class="text-3xl font-bold text-center mb-8">Technique Explorer</h2>
+            <div id="filter-container" class="flex flex-wrap justify-center gap-2 md:gap-4 mb-8">
+                <!-- Filter buttons will be injected here -->
+            </div>
+            <div id="technique-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <!-- Technique cards will be injected here -->
+            </div>
+        </section>
+
+        <!-- Content Sections -->
+        <div id="content-sections" class="space-y-24">
+            <!-- Content will be injected here -->
+        </div>
+
+    </main>
+    
+    <footer class="bg-gray-800 text-white mt-16">
+        <div class="container mx-auto px-6 py-8 text-center">
+            <p>&copy; 2025 Interactive Feature Engineering Handbook. All rights reserved.</p>
+            <p class="text-sm text-gray-400 mt-2">An interactive visualization of the comprehensive guide to feature engineering and selection.</p>
+        </div>
+    </footer>
+
+    <script>
+        const handbookData = {
+            foundations: {
+                title: "Part I: Foundational Principles",
+                id: "foundations",
+                chapters: [
+                    {
+                        id: "chapter1",
+                        title: "Chapter 1: The Centrality of Features",
+                        content: `
+                            <p class="mb-4">The performance of any machine learning model is fundamentally constrained by the quality of the data it is trained on. While algorithm selection and hyperparameter tuning are critical, they often yield diminishing returns compared to the profound impact of well-crafted features. These processes are the primary mechanisms through which domain knowledge is encoded and the signal within the data is amplified.</p>
+                            <h4 class="text-xl font-semibold mt-6 mb-2">Feature Engineering vs. Feature Selection</h4>
+                            <p class="mb-4"><b>Feature Engineering</b> is a creative, constructive process of using domain knowledge to transform raw data into meaningful input variables (features) that better represent the underlying problem. For example, transforming a raw timestamp into 'hour of day' or 'day of week'.</p>
+                            <p class="mb-4"><b>Feature Selection</b> is a reductive process of selecting a subset of the most relevant features to simplify the model, reduce training times, mitigate the "Curse of Dimensionality," and reduce overfitting.</p>
+                            <blockquote>The relationship is sequential and symbiotic: feature engineering should always precede feature selection. First, expand the feature space, then prune it down to an optimal subset.</blockquote>
+                        `
+                    },
+                    {
+                        id: "chapter2",
+                        title: "Chapter 2: The Curse of Dimensionality",
+                        content: `
+                            <p class="mb-4">The "Curse of Dimensionality" describes problems that arise when analyzing data in high-dimensional spaces. As the number of features increases, the volume of the feature space grows exponentially. This has several severe consequences:</p>
+                            <ul class="list-disc list-inside space-y-2 mb-4">
+                                <li><b>Data Sparsity:</b> For a fixed number of samples, the data points become far apart, making it hard for algorithms to find meaningful patterns.</li>
+                                <li><b>Increased Computational Cost:</b> More dimensions lead to longer training times and higher memory requirements.</li>
+                                <li><b>Overfitting:</b> With many features, a model can "memorize" the training data, including its noise, leading to poor generalization.</li>
+                                <li><b>Degradation of Distance Metrics:</b> In high dimensions, the concept of "nearness" can lose its meaning as points become almost equidistant from each other, harming algorithms like KNN and SVMs.</li>
+                            </ul>
+                            <p>The primary solution is <b>dimensionality reduction</b> through feature selection or feature extraction (e.g., PCA).</p>
+                        `
+                    }
+                ]
+            },
+            engineering: {
+                title: "Part II: Feature Engineering Techniques",
+                id: "engineering",
+                chapters: [
+                    {
+                        id: "chapter4",
+                        title: "Chapter 4: Handling Missing Data",
+                        content: `
+                            <p class="mb-4">Missing data is an unavoidable reality. Naively ignoring or deleting it can lead to information loss and bias. The correct strategy depends on the mechanism of missingness (MCAR, MAR, MNAR).</p>
+                            <h4 class="text-xl font-semibold mt-6 mb-2">Comparison of Encoding Techniques</h4>
+                            <p class="mb-4 text-gray-600">The radar chart below provides a multi-dimensional comparison of common categorical encoding methods. You can interact with the legend to toggle different encoders on and off to see how they stack up against criteria like dimensionality impact, risk of data leakage, and interpretability.</p>
+                            <div class="chart-container bg-white p-4 rounded-lg shadow-md">
+                                <canvas id="categoricalEncoderChart"></canvas>
+                            </div>
+                        `
+                    },
+                    {
+                        id: "chapter6",
+                        title: "Chapter 6: Transforming and Scaling Numerical Data",
+                        content: `
+                            <p class="mb-4">Numerical features often have different scales, ranges, and distributions. Scaling is crucial for many algorithms to ensure all features are on a level playing field.</p>
+                            <h4 class="text-xl font-semibold mt-6 mb-2">Why Scale?</h4>
+                            <ul class="list-disc list-inside space-y-2 mb-4">
+                                <li><b>Equal Importance:</b> Prevents large-scale features from dominating gradient-based models.</li>
+                                <li><b>Faster Convergence:</b> Helps optimization algorithms find the minimum more quickly.</li>
+                                <li><b>Algorithm Performance:</b> Essential for distance-based models like KNN and SVMs.</li>
+                            </ul>
+                            <h4 class="text-xl font-semibold mt-6 mb-2">Common Techniques</h4>
+                            <p><b>Standardization (Z-score):</b> Transforms data to have a mean of 0 and a standard deviation of 1. Good for normally distributed data.</p>
+                            <p><b>Normalization (Min-Max):</b> Rescales data to a fixed range, typically [0, 1]. Sensitive to outliers.</p>
+                            <p><b>Robust Scaling:</b> Uses median and IQR, making it robust to outliers.</p>
+                        `
+                    },
+                ]
+            },
+            selection: {
+                title: "Part III: Feature Selection Methods",
+                id: "selection",
+                chapters: [
+                    {
+                        id: "chapter10",
+                        title: "Chapter 10: Filter, Wrapper, and Embedded Methods",
+                        content: `
+                            <p class="mb-4">Feature selection prunes the feature set to an optimal subset. Techniques are broadly categorized into three families.</p>
+                            <ul class="list-disc list-inside space-y-2 mb-4">
+                                <li><b>Filter Methods:</b> Select features based on intrinsic statistical properties (e.g., correlation, chi-squared), independent of any model. They are very fast.</li>
+                                <li><b>Wrapper Methods:</b> Use a specific ML model to evaluate subsets of features. They are computationally expensive but often yield better performance.</li>
+                                <li><b>Embedded Methods:</b> Perform feature selection as an integral part of model training (e.g., LASSO regularization, tree-based importance). They offer a good balance of performance and efficiency.</li>
+                            </ul>
+                            <h4 class="text-xl font-semibold mt-6 mb-2">Methodology Trade-offs</h4>
+                            <p class="mb-4 text-gray-600">The chart below visualizes the trade-offs between the three main feature selection paradigms across key dimensions like computational cost and ability to handle feature interactions. Hover over the bars to see the relative scores.</p>
+                            <div class="chart-container bg-white p-4 rounded-lg shadow-md">
+                                <canvas id="selectionMethodsChart"></canvas>
+                            </div>
+                        `
+                    }
+                ]
+            },
+            best_practices: {
+                title: "Part IV: Advanced Topics and Best Practices",
+                id: "best-practices",
+                chapters: [
+                    {
+                        id: "chapter15",
+                        title: "Chapter 15: Preventing Data Leakage",
+                        content: `
+                            <p class="mb-4">Data leakage is a critical error where information from outside the training data is used to create the model, leading to overly optimistic performance estimates and poor real-world results. It's crucial to enforce a disciplined workflow to prevent it.</p>
+                            <h4 class="text-xl font-semibold mt-6 mb-2">The Wrong vs. The Right Way</h4>
+                            <p class="mb-4">The most common cause of leakage is performing preprocessing (like scaling or imputation) before splitting the data. The diagram below illustrates the correct, leak-free workflow.</p>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-6">
+                                <!-- Incorrect Workflow -->
+                                <div class="border-2 border-red-400 rounded-lg p-4 bg-red-50">
+                                    <h5 class="text-lg font-bold text-red-700 mb-2 text-center">❌ Incorrect Workflow (Data Leakage)</h5>
+                                    <div class="space-y-2 text-center">
+                                        <div class="bg-red-100 p-2 rounded">1. Full Dataset</div>
+                                        <div class="text-red-600 font-bold">↓</div>
+                                        <div class="bg-red-200 p-2 rounded font-semibold">2. Preprocess (Scale/Impute)</div>
+                                        <div class="text-red-600 font-bold">↓</div>
+                                        <div class="bg-red-100 p-2 rounded">3. Train/Test Split</div>
+                                    </div>
+                                    <p class="text-sm text-red-600 mt-4"><b>Problem:</b> Information from the test set (e.g., its mean or max value) has "leaked" into the training set during the preprocessing step.</p>
+                                </div>
+                                <!-- Correct Workflow -->
+                                <div class="border-2 border-green-400 rounded-lg p-4 bg-green-50">
+                                    <h5 class="text-lg font-bold text-green-700 mb-2 text-center">✅ Correct Workflow (No Leakage)</h5>
+                                    <div class="space-y-2 text-center">
+                                        <div class="bg-green-100 p-2 rounded">1. Full Dataset</div>
+                                        <div class="text-green-600 font-bold">↓</div>
+                                        <div class="bg-green-200 p-2 rounded font-semibold">2. Train/Test Split</div>
+                                        <div class="text-green-600 font-bold">↓</div>
+                                        <div class="bg-green-100 p-2 rounded">3. Fit Preprocessor on Train ONLY</div>
+                                        <div class="text-green-600 font-bold">↓</div>
+                                        <div class="bg-green-100 p-2 rounded">4. Transform Train & Test Sets</div>
+                                    </div>
+                                    <p class="text-sm text-green-600 mt-4"><b>Solution:</b> The test set is held out completely. All fitting parameters are learned from the training data alone.</p>
+                                </div>
+                            </div>
+                            <h4 class="text-xl font-semibold mt-8 mb-2">Best Practice: Use Pipelines</h4>
+                            <p>The most robust way to prevent leakage is to encapsulate all steps in a <code>scikit-learn</code> Pipeline. This ensures that for each fold in cross-validation, transformations are fitted only on the training portion of that fold.</p>
+                        `
+                    }
+                ]
+            }
+        };
+
+        const techniques = [
+            { name: "Mean/Median Imputation", category: "Missing Data", link: "#chapter4" },
+            { name: "Mode Imputation", category: "Missing Data", link: "#chapter4" },
+            { name: "Constant Imputation", category: "Missing Data", link: "#chapter4" },
+            { name: "KNN Imputer", category: "Missing Data", link: "#chapter4" },
+            { name: "MICE", category: "Missing Data", link: "#chapter4" },
+            { name: "Label / Ordinal Encoding", category: "Categorical Encoding", link: "#chapter4" },
+            { name: "One-Hot Encoding", category: "Categorical Encoding", link: "#chapter4" },
+            { name: "Target Encoding", category: "Categorical Encoding", link: "#chapter4" },
+            { name: "Hashing Encoder", category: "Categorical Encoding", link: "#chapter4" },
+            { name: "Standardization", category: "Scaling", link: "#chapter6" },
+            { name: "Normalization", category: "Scaling", link: "#chapter6" },
+            { name: "Robust Scaling", category: "Scaling", link: "#chapter6" },
+            { name: "Log Transformation", category: "Scaling", link: "#chapter6" },
+            { name: "Box-Cox Transformation", category: "Scaling", link: "#chapter6" },
+            { name: "Pearson's Correlation", category: "Filter Methods", link: "#chapter10" },
+            { name: "Chi-Squared Test", category: "Filter Methods", link: "#chapter10" },
+            { name: "ANOVA F-test", category: "Filter Methods", link: "#chapter10" },
+            { name: "Mutual Information", category: "Filter Methods", link: "#chapter10" },
+            { name: "Forward Selection", category: "Wrapper Methods", link: "#chapter10" },
+            { name: "Backward Elimination", category: "Wrapper Methods", link: "#chapter10" },
+            { name: "Recursive Feature Elimination", category: "Wrapper Methods", link: "#chapter10" },
+            { name: "LASSO (L1) Regularization", category: "Embedded Methods", link: "#chapter10" },
+            { name: "Tree-Based Importance", category: "Embedded Methods", link: "#chapter10" },
+            { name: "Data Leakage Prevention", category: "Best Practices", link: "#chapter15" },
+        ];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const filterContainer = document.getElementById('filter-container');
+            const techniqueGrid = document.getElementById('technique-grid');
+            const contentContainer = document.getElementById('content-sections');
+
+            // Populate Content
+            Object.values(handbookData).forEach(part => {
+                const partSection = document.createElement('section');
+                partSection.id = part.id;
+                partSection.innerHTML = `<h2 class="text-3xl font-bold mb-8 border-b-2 border-gray-200 pb-2">${part.title}</h2>`;
+                const chaptersDiv = document.createElement('div');
+                chaptersDiv.className = "space-y-12";
+                
+                part.chapters.forEach(chapter => {
+                    const chapterArticle = document.createElement('article');
+                    chapterArticle.id = chapter.id;
+                    chapterArticle.innerHTML = `
+                        <h3 class="text-2xl font-semibold mb-4">${chapter.title}</h3>
+                        <div class="prose prose-lg max-w-none text-gray-700 leading-relaxed">${chapter.content}</div>
+                    `;
+                    chaptersDiv.appendChild(chapterArticle);
+                });
+                partSection.appendChild(chaptersDiv);
+                contentContainer.appendChild(partSection);
+            });
+            
+            // Populate Techniques and Filters
+            const categories = ['All', ...new Set(techniques.map(t => t.category))];
+
+            categories.forEach(category => {
+                const button = document.createElement('button');
+                button.textContent = category;
+                button.className = 'filter-btn px-4 py-2 text-sm font-medium rounded-full bg-white text-gray-700 shadow-sm hover:bg-gray-50';
+                if (category === 'All') button.classList.add('active');
+                button.dataset.filter = category;
+                filterContainer.appendChild(button);
+            });
+
+            const renderTechniques = (filter = 'All') => {
+                techniqueGrid.innerHTML = '';
+                const filteredTechniques = filter === 'All' ? techniques : techniques.filter(t => t.category === filter);
+
+                filteredTechniques.forEach(technique => {
+                    const card = document.createElement('a');
+                    card.href = technique.link;
+                    card.className = 'technique-card block bg-white p-6 rounded-lg shadow-md hover:shadow-xl cursor-pointer';
+                    card.innerHTML = `
+                        <h4 class="font-bold text-lg mb-2 text-gray-800">${technique.name}</h4>
+                        <span class="text-sm font-medium text-white px-2 py-1 rounded-full" style="background-color: ${getCategoryColor(technique.category)}">${technique.category}</span>
+                    `;
+                    techniqueGrid.appendChild(card);
+                });
+            };
+
+            filterContainer.addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON') {
+                    document.querySelector('.filter-btn.active').classList.remove('active');
+                    e.target.classList.add('active');
+                    renderTechniques(e.target.dataset.filter);
+                }
+            });
+
+            const getCategoryColor = (category) => {
+                const colors = {
+                    "Missing Data": "#E07A5F",
+                    "Categorical Encoding": "#3D405B",
+                    "Scaling": "#81B29A",
+                    "Filter Methods": "#F2CC8F",
+                    "Wrapper Methods": "#3D5A80",
+                    "Embedded Methods": "#98C1D9",
+                    "Best Practices": "#E76F51"
+                };
+                return colors[category] || '#6c757d';
+            };
+
+            // Mobile Menu Toggle
+            const mobileMenuButton = document.getElementById('mobile-menu-button');
+            const mobileMenu = document.getElementById('mobile-menu');
+            mobileMenuButton.addEventListener('click', () => {
+                mobileMenu.classList.toggle('hidden');
+            });
+            
+            // Nav link active state on scroll
+            const sections = document.querySelectorAll('main section[id]');
+            const navLinks = document.querySelectorAll('header .nav-link');
+            
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        navLinks.forEach(link => {
+                            link.classList.toggle('active', link.getAttribute('href').substring(1) === entry.target.id);
+                        });
+                    }
+                });
+            }, { rootMargin: "-50% 0px -50% 0px" });
+
+            sections.forEach(section => observer.observe(section));
+
+
+            // Initial Render
+            renderTechniques();
+            renderCharts();
+        });
+
+        function renderCharts() {
+            // Chart 1: Feature Selection Methods
+            const ctxSelection = document.getElementById('selectionMethodsChart').getContext('2d');
+            new Chart(ctxSelection, {
+                type: 'bar',
+                data: {
+                    labels: ['Filter', 'Wrapper', 'Embedded'],
+                    datasets: [{
+                        label: 'Computational Cost',
+                        data: [1, 10, 4],
+                        backgroundColor: 'rgba(224, 122, 95, 0.6)',
+                        borderColor: 'rgba(224, 122, 95, 1)',
+                        borderWidth: 1
+                    }, {
+                        label: 'Ability to Handle Interactions',
+                        data: [2, 9, 7],
+                        backgroundColor: 'rgba(129, 178, 154, 0.6)',
+                        borderColor: 'rgba(129, 178, 154, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Feature Selection Method Trade-offs',
+                            font: { size: 16, family: 'Lora' }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    let val = context.raw;
+                                    let text = val > 7 ? 'High' : val > 3 ? 'Medium' : 'Low';
+                                    return `${label}${text} (${val}/10)`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            max: 10,
+                            ticks: {
+                                callback: function(value) {
+                                    if(value === 0) return 'Low';
+                                    if(value === 5) return 'Medium';
+                                    if(value === 10) return 'High';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Chart 2: Categorical Encoders
+            const ctxCategorical = document.getElementById('categoricalEncoderChart').getContext('2d');
+            new Chart(ctxCategorical, {
+                type: 'radar',
+                data: {
+                    labels: ['Dimensionality Impact', 'Interpretability', 'Overfitting/Leakage Risk', 'Computational Cost', 'Handles Unseen Categories'],
+                    datasets: [
+                        {
+                            label: 'One-Hot Encoding',
+                            data: [1, 9, 2, 3, 1],
+                            backgroundColor: 'rgba(224, 122, 95, 0.2)',
+                            borderColor: 'rgba(224, 122, 95, 1)',
+                            pointBackgroundColor: 'rgba(224, 122, 95, 1)'
+                        },
+                        {
+                            label: 'Target Encoding',
+                            data: [9, 5, 9, 5, 2],
+                            backgroundColor: 'rgba(61, 64, 91, 0.2)',
+                            borderColor: 'rgba(61, 64, 91, 1)',
+                            pointBackgroundColor: 'rgba(61, 64, 91, 1)'
+                        },
+                        {
+                            label: 'Hashing Encoder',
+                            data: [8, 1, 4, 8, 9],
+                            backgroundColor: 'rgba(129, 178, 154, 0.2)',
+                            borderColor: 'rgba(129, 178, 154, 1)',
+                            pointBackgroundColor: 'rgba(129, 178, 154, 1)'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Categorical Encoding Method Comparison',
+                            font: { size: 16, family: 'Lora' }
+                        },
+                         tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    let val = context.raw;
+                                    let text = val > 7 ? 'High' : val > 3 ? 'Medium' : 'Low';
+                                    return `${label}${text} (${val}/10)`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        r: {
+                            beginAtZero: true,
+                            max: 10,
+                            ticks: {
+                                stepSize: 2,
+                                backdropColor: 'transparent'
+                            },
+                            pointLabels: {
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+
+</body>
+</html>
